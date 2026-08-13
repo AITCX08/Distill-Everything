@@ -1,0 +1,32 @@
+.status-panel .status-panel__models {
+  display: grid;
+  gap: 8px;
+}
+
+.status-panel__models dd {
+  display: grid;
+  gap: 8px;
+}
+
+.status-panel__models dd::before {
+  display: none;
+}
+
+.status-panel__models dd span {
+  display: grid;
+  gap: 3px;
+  padding-left: 13px;
+  border-left: 2px solid var(--accent-soft);
+}
+
+.status-panel__models small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.status-panel__models strong {
+  overflow-wrap: anywhere;
+  color: #c6e7ea;
+  font-size: 12px;
+  line-height: 1.45;
+}

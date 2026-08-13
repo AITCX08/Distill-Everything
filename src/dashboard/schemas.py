@@ -5,10 +5,21 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class RuntimeModelResponse(BaseModel):
+    provider: str
+    model: str
+
+
+class RuntimeModelsResponse(BaseModel):
+    transcription: RuntimeModelResponse
+    summary: RuntimeModelResponse
+
+
 class HealthResponse(BaseModel):
     status: str
     api_version: str
     static_compatible: bool
+    models: RuntimeModelsResponse
 
 
 class OutputDirectoryInput(BaseModel):

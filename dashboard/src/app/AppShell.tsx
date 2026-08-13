@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { Badge, Text } from "@fluentui/react-components";
 import {
   AddSquareRegular,
@@ -9,6 +9,8 @@ import {
   HomeRegular,
 } from "@fluentui/react-icons";
 import type { WorkspaceId } from "./useWorkspace";
+import { getJson } from "../api/client";
+import type { HealthResponse, RuntimeModels } from "../api/schema";
 
 const navigation: ReadonlyArray<{ id: WorkspaceId; label: string; icon: typeof HomeRegular }> = [
   { id: "mission", label: "工作台", icon: HomeRegular },
@@ -18,7 +20,26 @@ const navigation: ReadonlyArray<{ id: WorkspaceId; label: string; icon: typeof H
   { id: "artifacts", label: "知识库", icon: BookRegular },
 ];
 
+const UNAVAILABLE_MODELS: RuntimeModels = {
+  transcription: { provider: "本地引擎", model: "暂不可用" },
+  summary: { provider: "本地引擎", model: "暂不可用" },
+};
+
+function modelLabel({ provider, model }: { provider: string; model: string }): string {
+  return `${provider} / ${model}`;
+}
+
 export function AppShell({ children, activeWorkspace = "mission" }: PropsWithChildren<{ activeWorkspace?: WorkspaceId }>) {
+  const [models, setModels] = useState<RuntimeModels>(UNAVAILABLE_MODELS);
+
+  useEffect(() => {
+    let mounted = true;
+    getJson<HealthResponse>("/api/v1/health")
+      .then((health) => { if (mounted) setModels(health.models); })
+      .catch(() => { if (mounted) setModels(UNAVAILABLE_MODELS); });
+    return () => { mounted = false; };
+  }, []);
+
   return <div className="dashboard-frame">
     <header className="dashboard-topbar">
       <a className="dashboard-brand" href="#mission" aria-label="Distill Everything 工作台首页">
@@ -39,7 +60,13 @@ export function AppShell({ children, activeWorkspace = "mission" }: PropsWithChi
         <div className="status-panel__heading"><DocumentRegular aria-hidden="true" /> <Text as="h2" size={400}>运行状态</Text></div>
         <dl>
           <div><dt>服务状态</dt><dd>运行中</dd></div>
-          <div><dt>模型状态</dt><dd>由任务按需加载</dd></div>
+          <div className="status-panel__models">
+            <dt>模型状态</dt>
+            <dd>
+              <span><small>转写模型</small><strong>{modelLabel(models.transcription)}</strong></span>
+              <span><small>摘要模型</small><strong>{modelLabel(models.summary)}</strong></span>
+            </dd>
+          </div>
           <div><dt>存储状态</dt><dd>本地优先</dd></div>
         </dl>
       </section>

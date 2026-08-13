@@ -1,4 +1,7 @@
 export type JobStatus = "queued" | "running" | "pause_requested" | "paused" | "partial" | "completed" | "failed";
+export interface RuntimeModel { provider: string; model: string; }
+export interface RuntimeModels { transcription: RuntimeModel; summary: RuntimeModel; }
+export interface HealthResponse { status: string; api_version: string; static_compatible: boolean; models: RuntimeModels; }
 export interface JobSummary { job_id: string; status: JobStatus; revision: number; platform: string; creator_name: string; total_items: number; completed_items: number; failed_items: number; unsupported_items: number; updated_at: string; }
 export interface MissionJob {
   job_id: string;

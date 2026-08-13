@@ -29,6 +29,32 @@ from src.dashboard.security import CSRF_COOKIE, SESSION_COOKIE, new_local_sessio
 from src.distillation.state import RevisionConflict
 
 _CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+_SUMMARY_PROVIDERS = {
+    "claude": ("Anthropic", "anthropic"),
+    "openai": ("OpenAI", "openai"),
+    "qwen": ("Qwen", "qwen"),
+    "deepseek": ("DeepSeek", "deepseek"),
+    "ollama": ("Ollama", "ollama"),
+}
+
+
+def _runtime_models(config: object | None) -> dict[str, dict[str, str]]:
+    """Return display-safe model names without exposing endpoints or credentials."""
+
+    unavailable = {"provider": "未配置", "model": "未配置"}
+    if config is None:
+        return {"transcription": unavailable.copy(), "summary": unavailable.copy()}
+
+    funasr = getattr(config, "funasr", None)
+    transcription_model = str(getattr(funasr, "model", "") or "未配置")
+    provider_key = str(getattr(config, "llm_provider", "") or "").lower()
+    provider_label, config_name = _SUMMARY_PROVIDERS.get(provider_key, (provider_key or "未配置", ""))
+    summary_config = getattr(config, config_name, None) if config_name else None
+    summary_model = str(getattr(summary_config, "model", "") or "未配置")
+    return {
+        "transcription": {"provider": "FunASR", "model": transcription_model},
+        "summary": {"provider": provider_label, "model": summary_model},
+    }
 
 
 def create_dashboard_app(
@@ -53,6 +79,7 @@ def create_dashboard_app(
     app.state.series_controller = None
     app.state.task_manager = None
     runner_config = getattr(getattr(service, "source_runner", None), "config", None)
+    app.state.runtime_models = _runtime_models(runner_config)
     configured_output_directory = getattr(runner_config, "output_dir", service.repository.root.parent / "output")
     app.state.output_directories = OutputDirectoryService(
         service.repository.root.parent / "dashboard-settings.json",

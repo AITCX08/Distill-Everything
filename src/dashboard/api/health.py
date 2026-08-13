@@ -13,4 +13,5 @@ def health(request: Request) -> HealthResponse:
         status="ok",
         api_version="v1",
         static_compatible=request.app.state.static_compatible,
+        models=request.app.state.runtime_models,
     )

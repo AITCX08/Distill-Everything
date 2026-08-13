@@ -1,9 +1,24 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    status: "ok",
+    api_version: "v1",
+    static_compatible: true,
+    models: {
+      transcription: { provider: "FunASR", model: "paraformer-zh" },
+      summary: { provider: "DeepSeek", model: "deepseek-chat" },
+    },
+  }), { status: 200 })));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("AppShell", () => {
   it("renders the unified workbench navigation, local engine state, and privacy footer", () => {
@@ -22,5 +37,16 @@ describe("AppShell", () => {
 
     expect(screen.getByRole("navigation", { name: "主导航" })).toBeVisible();
     expect(screen.getByRole("link", { name: "创建任务" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the current transcription and summary models from the local engine", async () => {
+    render(<AppShell><main>内容</main></AppShell>);
+
+    const status = screen.getByRole("region", { name: "运行状态" });
+    expect(await screen.findByText("FunASR / paraformer-zh")).toBeVisible();
+    expect(screen.getByText("DeepSeek / deepseek-chat")).toBeVisible();
+    expect(status).toHaveTextContent("转写模型");
+    expect(status).toHaveTextContent("摘要模型");
+    expect(status).not.toHaveTextContent("由任务按需加载");
   });
 });
