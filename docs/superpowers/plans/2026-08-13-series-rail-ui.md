@@ -4,7 +4,7 @@
 
 **目标：** 将工作台中浏览器默认样式的第 1 至第 8 集数字条改造成可识别状态、可选择、可换行的圆形节点轨道。
 
-**架构：** 保留 `SeriesRail` 的输入属性和 `onSelect(rowId)` 行为，只在组件内部增加状态标记与提示语义，并在现有 `operations.css` 中补齐 BEM 样式。自动化测试验证用户可观察的状态、提示和选择行为，CSS 使用项目现有主题变量，不引入依赖。
+**架构：** 保留 `SeriesRail` 的输入属性和 `onSelect(rowId)` 行为，只在组件内部增加状态标记与提示语义。作品轨道样式使用独立的 `series-rail.css`，由现有前端入口在全局操作样式后加载；自动化测试验证用户可观察的状态、提示和选择行为，CSS 使用项目现有主题变量，不引入依赖。
 
 **技术栈：** React 18、TypeScript、Vitest、Testing Library、原生 CSS、现有 Fluent UI 主题变量。
 
@@ -28,7 +28,7 @@
 - 使用：`SeriesRail({ total, completed, active, failed, selectedRowId, onSelect })`
 - 验证：节点的 `data-status`、`title`、状态标记、`aria-label` 和 `aria-pressed`
 
-- [ ] **步骤 1：写入失败测试**
+- [x] **步骤 1：写入失败测试**
 
   在现有点击测试后增加状态呈现测试，使用 `within` 检查完成标记和失败标记：
 
@@ -49,7 +49,7 @@
   });
   ```
 
-- [ ] **步骤 2：运行定向测试并确认按预期失败**
+- [x] **步骤 2：运行定向测试并确认按预期失败**
 
   在 `dashboard` 目录运行：
 
@@ -59,7 +59,7 @@
 
   预期：新增用例失败，原因是节点尚无 `title` 和状态标记；原有点击用例继续通过。
 
-- [ ] **步骤 3：提交测试红灯**
+- [x] **步骤 3：提交测试红灯**
 
   ```powershell
   git add -- dashboard/src/features/mission-control/SeriesRail.test.tsx
@@ -77,7 +77,7 @@
 - 新增内部函数：`markFor(status: PartStatus): string | null`
 - 产生：`.series-rail__list`、`.series-rail__part`、`.series-rail__item`、`.series-rail__number`、`.series-rail__marker`
 
-- [ ] **步骤 1：实现最小语义结构**
+- [x] **步骤 1：实现最小语义结构**
 
   用以下实现替换 `SeriesRail.tsx`。完成状态返回 `✓`、失败状态返回 `!`，其余状态不渲染文字标记；标记设置 `aria-hidden="true"`，避免读屏重复朗读。
 
@@ -139,7 +139,7 @@
   }
   ```
 
-- [ ] **步骤 2：运行定向测试并确认转绿**
+- [x] **步骤 2：运行定向测试并确认转绿**
 
   ```powershell
   & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
@@ -147,7 +147,7 @@
 
   预期：`SeriesRail.test.tsx` 全部通过，无错误或警告。
 
-- [ ] **步骤 3：提交组件实现**
+- [x] **步骤 3：提交组件实现**
 
   ```powershell
   git add -- dashboard/src/features/mission-control/SeriesRail.tsx
@@ -157,13 +157,15 @@
 ### 任务 3：实现圆形轨道视觉与响应式布局
 
 **文件：**
-- 修改：`dashboard/src/theme/operations.css`
+- 新增：`dashboard/src/theme/series-rail.css`
+- 修改：`dashboard/src/main.tsx`
+- 更新：`src/dashboard/static/` 内置前端产物
 
 **接口：**
 - 使用：任务 2 产生的 `series-rail` BEM 类名和 `data-status`
 - 产生：40px 圆形节点、连接线、完成/执行/失败/等待/选中/焦点状态以及窄屏换行
 
-- [ ] **步骤 1：补齐组件样式**
+- [x] **步骤 1：补齐组件样式**
 
   在任务工作台样式区加入以下规则：
 
@@ -188,7 +190,7 @@
   @media(max-width:560px){.series-rail{padding:16px}.series-rail__list{column-gap:12px}.series-rail__part:not(:last-child)::after{width:12px}}
   ```
 
-- [ ] **步骤 2：运行组件测试和前端构建**
+- [x] **步骤 2：运行组件测试和前端构建**
 
   ```powershell
   & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
@@ -198,7 +200,7 @@
 
   预期：测试通过，TypeScript 编译成功，Vite 生成 `dist` 且无错误。
 
-- [ ] **步骤 3：在本地工作台完成视觉验收**
+- [x] **步骤 3：在本地工作台完成视觉验收**
 
   打开现有本地 Dashboard 的 `/#mission`，确认：
 
@@ -208,12 +210,12 @@
   4. 缩窄浏览器后节点自然换行且页面没有横向溢出。
   5. Tab 键焦点轮廓清晰，完成和失败状态包含非颜色标记。
 
-- [ ] **步骤 4：检查差异并提交样式**
+- [x] **步骤 4：检查差异并提交样式**
 
   ```powershell
   git diff --check
   git status --short
-  git add -- dashboard/src/theme/operations.css
+  git add -- dashboard/src/main.tsx dashboard/src/theme/series-rail.css src/dashboard/static
   git commit -m "style: 重绘作品轨道节点"
   ```
 
@@ -222,12 +224,14 @@
 **文件：**
 - 核对：`dashboard/src/features/mission-control/SeriesRail.tsx`
 - 核对：`dashboard/src/features/mission-control/SeriesRail.test.tsx`
-- 核对：`dashboard/src/theme/operations.css`
+- 核对：`dashboard/src/theme/series-rail.css`
+- 核对：`dashboard/src/main.tsx`
+- 核对：`src/dashboard/static/`
 
 **接口：**
 - 不新增公共接口；确认所有原有属性与点击回调兼容。
 
-- [ ] **步骤 1：运行前端定向测试和构建复验**
+- [x] **步骤 1：运行前端定向测试和构建复验**
 
   ```powershell
   & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
@@ -237,7 +241,7 @@
 
   预期：所有命令退出码为 0。
 
-- [ ] **步骤 2：检查提交范围**
+- [x] **步骤 2：检查提交范围**
 
   ```powershell
   git status --short
@@ -245,3 +249,11 @@
   ```
 
   预期：除计划跟踪更新外没有未提交修改，最近提交只包含作品轨道测试、组件和样式。
+
+## 执行记录
+
+- 定向测试先因缺少节点提示而失败，加入语义结构后通过，完成红灯到绿灯验证。
+- 完整前端回归通过：24 个测试文件、64 个测试全部成功。
+- TypeScript 编译与 Vite 生产构建成功，内置静态包校验成功。
+- 本地服务已从旧资源 `index-DCjzjv9c.css` 切换到新资源 `index-BiPm8n8x.css`，浏览器检测到 18 条作品轨道样式规则且控制台无错误。
+- 验收时本地服务没有任务记录，因此工作台未生成真实作品轨道；节点状态、点击语义和产物结构由组件测试覆盖，实际样式加载由浏览器检查覆盖。

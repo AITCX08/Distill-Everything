@@ -57,7 +57,7 @@
 ## 代码范围
 
 - 更新 `dashboard/src/features/mission-control/SeriesRail.tsx`，补充状态标记和提示文本所需的语义结构。
-- 更新 `dashboard/src/theme/operations.css`，新增完整的 `series-rail` 样式与响应式规则。
+- 新增 `dashboard/src/theme/series-rail.css` 并由 `dashboard/src/main.tsx` 在全局样式后加载，集中维护完整的 `series-rail` 样式与响应式规则。
 - 更新 `dashboard/src/features/mission-control/SeriesRail.test.tsx`，验证状态、选中语义、点击和可访问名称。
 - 如视觉验收需要，可补充现有工作台端到端用例，但不修改后端接口、任务状态模型或任务排序算法。
 
