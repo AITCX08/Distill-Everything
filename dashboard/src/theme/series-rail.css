@@ -1,0 +1,152 @@
+.series-rail {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgb(13 30 39 / 92%), rgb(7 20 27 / 92%));
+}
+
+.series-rail__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.series-rail__heading span:first-child {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.series-rail__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.series-rail__part {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.series-rail__part:not(:last-child)::after {
+  position: absolute;
+  top: 19px;
+  left: 40px;
+  width: 18px;
+  height: 2px;
+  background: var(--line-strong);
+  content: "";
+  pointer-events: none;
+}
+
+.series-rail__item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #0a171d;
+  color: var(--text-secondary);
+  font: 700 14px/1 "Cascadia Mono", Consolas, monospace;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.series-rail__item:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.series-rail__item:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 5px;
+}
+
+.series-rail__item[data-status="已完成"] {
+  border-color: rgb(66 217 150 / 72%);
+  background: rgb(66 217 150 / 10%);
+  color: var(--success);
+}
+
+.series-rail__item[data-status="执行中"] {
+  border-color: var(--accent);
+  background: rgb(39 216 242 / 12%);
+  box-shadow: 0 0 18px rgb(39 216 242 / 22%);
+  color: var(--accent-strong);
+}
+
+.series-rail__item[data-status="失败"] {
+  border-color: rgb(255 124 124 / 78%);
+  background: rgb(255 124 124 / 10%);
+  color: var(--danger);
+}
+
+.series-rail__item[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px #07151c,
+    0 0 0 4px var(--accent-strong);
+}
+
+.series-rail__item[data-status="执行中"][aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px #07151c,
+    0 0 0 4px var(--accent-strong),
+    0 0 20px rgb(39 216 242 / 30%);
+}
+
+.series-rail__number {
+  transform: translateY(0.5px);
+}
+
+.series-rail__marker {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #07151c;
+  border-radius: 50%;
+  background: var(--success);
+  color: #03120e;
+  font: 900 10px/1 system-ui, sans-serif;
+}
+
+.series-rail__item[data-status="失败"] .series-rail__marker {
+  background: var(--danger);
+  color: #1b0505;
+}
+
+@media (max-width: 560px) {
+  .series-rail {
+    padding: 16px;
+  }
+
+  .series-rail__list {
+    column-gap: 12px;
+  }
+
+  .series-rail__part:not(:last-child)::after {
+    width: 12px;
+  }
+}
