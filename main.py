@@ -273,6 +273,30 @@ def dashboard(port: int, open_browser: bool):
     run_dashboard(build_dashboard_service(load_config()), port=port, open_browser=open_browser)
 
 
+@cli.command("mcp")
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "sse", "streamable-http"]),
+    default="stdio",
+    show_default=True,
+    help="stdio 给 Claude Desktop/Cursor；sse/streamable-http 给本地 HTTP 客户端",
+)
+@click.option("--host", default="127.0.0.1", show_default=True, help="HTTP 传输绑定地址")
+@click.option("--port", type=click.IntRange(1, 65535), default=8877, show_default=True)
+def mcp_command(transport: str, host: str, port: int):
+    """以 MCP Server 暴露蒸馏能力，供其他 AI Agent 调用。"""
+
+    from src.config import load_config
+    from src.mcp_server.server import run as run_mcp_server
+
+    run_mcp_server(
+        build_dashboard_service(load_config()),
+        transport=transport,
+        host=host,
+        port=port,
+    )
+
+
 @cli.group()
 def source():
     """管理内容平台并蒸馏创作者作品。"""

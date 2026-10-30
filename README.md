@@ -316,6 +316,30 @@ python main.py feishu-meeting --help
 
 旧版 Bilibili 分阶段命令 `login`、`crawl`、`asr`、`clean`、`model`、`generate`、`run` 也保留，便于已有脚本和工作流迁移；新项目优先使用 `source creator` 或 Dashboard。
 
+## 给 AI Agent 用（MCP Server）
+
+本项目可以直接作为 **MCP Server** 运行，把「预检 → 建任务 → 看进度 → 读产物」暴露成 9 个工具，供 Claude Desktop、Cursor 或自研 Agent 调用：
+
+```bash
+pip install -r requirements-mcp.txt
+python main.py mcp                        # stdio，给桌面客户端
+python main.py mcp --transport sse --port 8877   # 本地 HTTP
+```
+
+```json
+{
+  "mcpServers": {
+    "distill-everything": {
+      "command": "C:\\Python314\\python.exe",
+      "args": ["main.py", "mcp"],
+      "cwd": "D:\\Vibe\\Distill-Everything"
+    }
+  }
+}
+```
+
+工具清单、调用顺序、安全边界与排障见 [docs/mcp.md](./docs/mcp.md)。要点：MCP 不接收也不返回任何凭据，登录仍在 Dashboard 页内弹窗或 CLI 完成；产物只给文件名与内容，不外传绝对路径。
+
 ## 扩展一个平台或输出
 
 新增平台时，在 `src/platforms/` 实现 `PlatformAdapter` 并注册到 `PlatformRegistry`。适配器只负责平台边界：匹配、认证、解析、枚举、刷新和下载。

@@ -6,6 +6,11 @@
 
 ### 新增
 
+- **MCP Server**：`python main.py mcp`（stdio / sse / streamable-http），暴露 9 个工具
+  （`distill_list_platforms`、`distill_preview`、`distill_create_job`、`distill_list_jobs`、
+  `distill_get_job`、`distill_list_job_items`、`distill_list_artifacts`、`distill_read_artifact`、
+  `distill_control_job`），供 Claude Desktop / Cursor / 自研 Agent 调用；可选依赖 `requirements-mcp.txt`，
+  stdio 模式下应用日志改道 stderr，避免污染 JSON-RPC 帧。
 - 抖音收藏夹 / 合集自动蒸馏：新增 `collection` target 类型，支持
   `https://www.douyin.com/user/self?showTab=collect`、`https://www.douyin.com/collection/<id>`
   与显式写法 `douyin:collection:<id>`；解析不启动浏览器，枚举只接受收藏类 JSON 端点。
