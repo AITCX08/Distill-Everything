@@ -25,6 +25,8 @@
 - 修复循环导入：`import src.outputs` 或单独运行 `pytest tests/outputs` 会抛 `ImportError: cannot import name 'ArtifactKind' from partially initialized module`。
 - 修复任务初始化崩溃：`SourceCreator.raw_metadata`（`MappingProxyType`）参与 `dataclasses.asdict` 导致 `TypeError: cannot pickle 'mappingproxy' object`；现在 `job_state.json` 只持久化公开身份字段。
 - 修复非正常关闭后 Dashboard 无法启动：`psutil.NoSuchProcess` 不被 `OSError` 捕获，遗留的 TaskManager owner 行会让启动直接抛异常。
+- 修复 Windows 上 `os.kill(pid, 0)` 误发 CTRL+C：该调用被翻译成 `GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid)`，会打断整个控制台进程组（这也是此前「Windows 测试不稳定」的真实原因）。新增 `src/application/process.py::process_is_alive`。
+- 修复 Windows 文件共享冲突：worker 删除 `resource-request.json` 时管理器正在读它，`WinError 32` 会让 worker 以退出码 1 结束。新增 `src/fsutil.py` 的 `replace_with_retry` / `unlink_with_retry`。
 - 修复 `src/model/knowledge_extractor.py` 中散落在函数之间的模块级 import（潜在的导入顺序脆弱点）。
 - 清理仓库内 Ruff 报出的未使用导入与未使用变量。
 
