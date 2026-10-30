@@ -55,6 +55,9 @@ jobs:
     name: Python（Windows）
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,8 +73,26 @@ jobs:
         run: |
           python -c "import src.outputs; import src.platforms; import src.distillation"
           python -c "import src.outputs.base"
-      - name: Run test suite
-        run: python -m pytest
+      - name: Run backend suite
+        run: >-
+          python -m pytest
+          tests/application
+          tests/orchestration
+          tests/distillation
+          tests/outputs
+          tests/platforms
+          tests/series
+          tests/test_import_order.py
+          -p no:cacheprovider
+      - name: Run dashboard and document suite
+        run: >-
+          python -m pytest
+          tests/dashboard
+          tests/test_meeting_renderer.py
+          tests/test_text_processor.py
+          tests/test_knowledge_extractor.py
+          -p no:cacheprovider
+          --full-trace
 
   python-macos:
     name: Python（macOS 基础）
