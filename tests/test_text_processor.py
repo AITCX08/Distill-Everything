@@ -5,12 +5,10 @@ text_processor.py 单元测试
 "Expecting ',' delimiter: line 25 column 49 (char 3277)"）。
 """
 
-import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

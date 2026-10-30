@@ -144,7 +144,7 @@ class TestLoadCachedCredential:
         }
         cache.write_text(json.dumps(data), encoding="utf-8")
 
-        with patch("src.crawl.auth.Credential", create=True) as MockCred:
+        with patch("src.crawl.auth.Credential", create=True):
             # We need to mock the Credential import inside load_cached_credential
             mock_module = MagicMock()
             mock_cred_instance = MagicMock()

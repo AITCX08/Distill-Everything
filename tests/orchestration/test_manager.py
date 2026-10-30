@@ -1,6 +1,10 @@
 """Lifecycle tests for the process-owning task manager."""
 
-from src.orchestration.manager import TaskManager, TaskManagerOwnershipError
+from src.orchestration.manager import (
+    TaskManager,
+    TaskManagerOwnershipError,
+    _default_pid_probe,
+)
 from src.orchestration.store import OrchestrationStore
 import json
 
@@ -164,3 +168,27 @@ def test_manager_grants_only_one_asr_stage_to_two_worker_processes(tmp_path):
         for task in (first, second)
     ]
     assert grants.count(True) == 1
+
+
+DEAD_PID = 4_000_000
+
+
+def test_pid_probe_treats_a_missing_process_as_dead():
+    """``psutil.NoSuchProcess`` is not an ``OSError``; the probe must not raise."""
+
+    assert _default_pid_probe(DEAD_PID, "stale-marker") is False
+
+
+def test_claim_ownership_reclaims_a_stale_owner_row(tmp_path):
+    """An unclean shutdown leaves a dead PID behind; startup must take it over."""
+
+    store = OrchestrationStore(tmp_path / "orchestration.sqlite3")
+    assert store.claim_task_manager(
+        owner_id="dead-owner", pid=DEAD_PID, start_marker="stale-marker"
+    )
+
+    manager = TaskManager(store=store, worker_root=tmp_path / "workers")
+    manager.claim_ownership()
+
+    owner = store.task_manager_owner()
+    assert owner is not None and owner[0] != "dead-owner"

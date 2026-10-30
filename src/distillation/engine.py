@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,7 +35,12 @@ from src.distillation.store import JobStateStore
 from src.distillation.supervisor import WorkerSupervisor
 from src.model.knowledge_extractor import load_video_knowledge
 from src.outputs.base import ArtifactKind, CorpusOutputContext, ItemOutputContext
-from src.platforms.models import DownloadedAssets, ItemType, SourceItem
+from src.platforms.models import (
+    DownloadedAssets,
+    ItemType,
+    SourceItem,
+    creator_record,
+)
 
 
 _STOP = object()
@@ -229,7 +234,7 @@ class DistillationEngine:
                 "llm_workers": request.llm_workers,
                 "max_active_items": request.max_active_items,
             },
-            creator=asdict(request.creator),
+            creator=creator_record(request.creator),
             items=items,
         )
         self.state = self.state_store.save(

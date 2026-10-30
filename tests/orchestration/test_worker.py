@@ -161,11 +161,12 @@ def test_resource_controlled_worker_runs_all_stages_after_manager_grants(tmp_pat
     result = []
     worker = threading.Thread(target=lambda: result.append(run_worker(task.task_id, payload, pipeline=pipeline)))
     worker.start()
-    deadline = time.monotonic() + 2
+    deadline = time.monotonic() + 10
     while worker.is_alive() and time.monotonic() < deadline:
         manager.tick()
         time.sleep(0.01)
-    worker.join(timeout=0.1)
+    worker.join(timeout=5)
+    assert not worker.is_alive(), "worker did not finish before the deadline"
 
     assert result == [0]
     assert (pipeline.download_calls, pipeline.extract_calls, pipeline.transcribe_calls) == (1, 1, 1)

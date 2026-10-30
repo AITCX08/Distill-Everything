@@ -4,7 +4,6 @@ Skill 生成模块
 使用 Jinja2 模板将UP主知识画像渲染为 SKILL.md 文件。
 """
 
-import json
 from datetime import datetime
 from pathlib import Path
 

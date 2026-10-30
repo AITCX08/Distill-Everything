@@ -1,7 +1,6 @@
 import pytest
 from fastapi import Depends
 
-from src.dashboard.app import create_dashboard_app
 from src.dashboard.security import require_mutation_security, validate_host
 from tests.dashboard.test_app import make_client
 

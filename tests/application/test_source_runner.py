@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 

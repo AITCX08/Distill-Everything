@@ -1,6 +1,5 @@
 """Isolated Bilibili worker stages without real network or credentials."""
 
-from pathlib import Path
 from types import SimpleNamespace
 
 from src.orchestration.bilibili_worker import BilibiliWorkPipeline, select_available_llm_provider

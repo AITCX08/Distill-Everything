@@ -1,5 +1,5 @@
 from src.asr.funasr_engine import (
-    _spk_label, _parse_result_segments, TranscriptSegment, FunASREngine,
+    _spk_label, _parse_result_segments, FunASREngine,
 )
 
 

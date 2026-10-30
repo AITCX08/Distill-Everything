@@ -550,7 +550,7 @@ class TestFallbackProfile:
             VideoKnowledge(
                 bvid=f"BV{i}", title=f"视频{i}",
                 core_views=[f"v{i}"],
-                key_concepts=[f"c{min(i, 10)}"] + [f"c0"] * (1 if i < 5 else 0),  # c0 出现多次
+                key_concepts=[f"c{min(i, 10)}"] + ["c0"] * (1 if i < 5 else 0),  # c0 出现多次
                 topics=[f"t{min(i, 5)}"] + ["t0"] * (1 if i < 3 else 0),  # t0 出现多次
             )
             for i in range(12)

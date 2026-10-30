@@ -1,4 +1,3 @@
-from dataclasses import replace
 from unittest.mock import Mock
 
 from src.platforms.douyin.downloader import DouyinDownloader

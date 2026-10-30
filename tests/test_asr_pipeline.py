@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -122,7 +121,7 @@ class TestProcessPendingBatch:
         audio.write_bytes(b"x" * 2048)
 
         engine = self._make_engine(success=True)
-        with patch("main.save_transcript", create=True) as mock_save, \
+        with patch("main.save_transcript", create=True), \
              patch("src.asr.funasr_engine.save_transcript") as _, \
              patch("src.asr.funasr_engine.check_transcript_integrity",
                    return_value=(True, "ok")):

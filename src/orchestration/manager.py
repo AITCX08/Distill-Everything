@@ -384,18 +384,29 @@ class TaskManager:
 def _start_marker(pid: int) -> str:
     try:
         import psutil
-
+    except ImportError:
+        return uuid.uuid4().hex
+    try:
         return str(psutil.Process(pid).create_time())
-    except (ImportError, OSError):
+    except (psutil.Error, OSError):
         return uuid.uuid4().hex
 
 
 def _default_pid_probe(pid: int, start_marker: str) -> bool:
+    """Return whether ``pid`` is still the process that wrote ``start_marker``.
+
+    ``psutil.NoSuchProcess`` derives from ``psutil.Error``, not ``OSError``: an
+    unclean shutdown leaves a stale owner row behind, and the Dashboard must
+    reclaim it instead of raising on startup.
+    """
+
     try:
         import psutil
-
+    except ImportError:
+        return False
+    try:
         return str(psutil.Process(pid).create_time()) == start_marker
-    except (ImportError, OSError):
+    except (psutil.Error, OSError):
         return False
 
 

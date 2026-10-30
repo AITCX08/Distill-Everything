@@ -15,7 +15,6 @@ from src.application.errors import (
 from src.application.events import EventHub
 from src.application.queries import JobRepository
 from src.distillation.state import (
-    ItemState,
     JobState,
     ProcessingStatus,
     RevisionConflict,

@@ -29,7 +29,7 @@ def test_sse_serializes_real_progress_snapshot_payloads():
         active_items=(), counts=ProgressCounts(total=4, active=1),
         eta_total_seconds=60, eta_active_slowest_seconds=30, provisional_eta=False,
     )
-    event = hub.publish("progress.snapshot", {"job_id": "job-1", "snapshot": snapshot})
+    hub.publish("progress.snapshot", {"job_id": "job-1", "snapshot": snapshot})
     service = SimpleNamespace(events=hub, list_jobs=lambda: ())
 
     async def next_message():

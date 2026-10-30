@@ -62,6 +62,7 @@ class SourceCreator:
     display_name: str
     canonical_url: str
     avatar_url: str | None = None
+    raw_metadata: Mapping[str, Any] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         _validate_platform(self.platform)
@@ -70,6 +71,22 @@ class SourceCreator:
             raise ValueError("Creator display name cannot be empty")
         if not self.canonical_url:
             raise ValueError("Creator canonical URL cannot be empty")
+        object.__setattr__(self, "raw_metadata", MappingProxyType(dict(self.raw_metadata)))
+
+
+_CREATOR_RECORD_FIELDS = ("platform", "creator_id", "display_name", "canonical_url")
+
+
+def creator_record(creator: SourceCreator) -> dict[str, str]:
+    """Serialize creator identity for persisted job state.
+
+    ``raw_metadata`` is a ``MappingProxyType`` and therefore neither deep-copyable
+    nor picklable, so ``dataclasses.asdict`` raises ``TypeError: cannot pickle
+    'mappingproxy' object``. It is also adapter-internal data that must not land in
+    ``job_state.json``. Only the stable public identity is persisted.
+    """
+
+    return {name: getattr(creator, name) for name in _CREATOR_RECORD_FIELDS}
 
 
 @dataclass(frozen=True)
@@ -145,6 +162,19 @@ class ResolvedTarget:
     creator_id: str
     canonical_url: str
     original_target: str
+    target_type: str = "creator"
+    metadata: Mapping[str, Any] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.platform:
+            raise ValueError("Resolved target platform cannot be empty")
+        if not self.creator_id:
+            raise ValueError("Resolved target creator ID cannot be empty")
+        if not self.canonical_url:
+            raise ValueError("Resolved target canonical URL cannot be empty")
+        if self.target_type not in {"creator", "video"}:
+            raise ValueError(f"Unsupported resolved target type: {self.target_type!r}")
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
 
 @dataclass(frozen=True)

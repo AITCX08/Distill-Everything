@@ -11,7 +11,6 @@ import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -77,7 +76,7 @@ class TestGenerateCookiesFile:
         out = tmp_path / "cookies.txt"
         generate_cookies_file(make_credential(), buvid3="b", output_path=out)
         lines = out.read_text(encoding="utf-8").strip().split("\n")
-        cookie_lines = [l for l in lines if not l.startswith("#")]
+        cookie_lines = [line for line in lines if not line.startswith("#")]
         for line in cookie_lines:
             fields = line.split("\t")
             assert len(fields) == 7, f"Expected 7 fields, got {len(fields)}: {line}"
@@ -86,7 +85,7 @@ class TestGenerateCookiesFile:
         out = tmp_path / "cookies.txt"
         generate_cookies_file(make_credential(), output_path=out)
         lines = out.read_text(encoding="utf-8").strip().split("\n")
-        cookie_lines = [l for l in lines if not l.startswith("#")]
+        cookie_lines = [line for line in lines if not line.startswith("#")]
         for line in cookie_lines:
             assert line.startswith(".bilibili.com")
 
@@ -232,3 +231,4 @@ def test_callback_download_measures_throughput_when_ytdlp_speed_is_unavailable(t
     assert result == output
     assert updates
     assert all(speed > 0 for _, _, speed in updates)
+

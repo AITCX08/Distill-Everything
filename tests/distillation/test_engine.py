@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 import time
 from dataclasses import dataclass
@@ -325,3 +326,40 @@ def test_engine_honors_a_pause_request_written_before_initialization(tmp_path):
     assert result.paused is True
     assert store.load().status == "paused"
     assert probes.maximum["download"] == 0
+
+
+def test_job_state_persists_only_public_creator_fields(tmp_path):
+    """``raw_metadata`` is a mapping proxy: it cannot be asdict-ed or persisted."""
+
+    probes = StageProbes()
+    store = JobStateStore(tmp_path / "job_state.json")
+    creator = SourceCreator(
+        platform="douyin",
+        creator_id="creator-1",
+        display_name="Creator",
+        canonical_url="https://www.douyin.com/user/creator-1",
+        raw_metadata={"sec_uid": "adapter-internal", "nested": {"cursor": 7}},
+    )
+    request = DistillationRequest(
+        job_id="job-1",
+        creator=creator,
+        items=make_items(1),
+        output_root=tmp_path / "output",
+        cleanup_media=False,
+    )
+    engine = DistillationEngine(
+        adapter=FakeAdapter(probes, tmp_path),
+        processor_factory=lambda: FakeProcessor(probes),
+        state_store=store,
+    )
+
+    asyncio.run(engine.run(request))
+
+    raw = (tmp_path / "job_state.json").read_text("utf-8")
+    assert "adapter-internal" not in raw
+    assert json.loads(raw)["creator"] == {
+        "platform": "douyin",
+        "creator_id": "creator-1",
+        "display_name": "Creator",
+        "canonical_url": "https://www.douyin.com/user/creator-1",
+    }

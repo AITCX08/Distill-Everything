@@ -8,7 +8,13 @@
 import json
 import re
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING
+
+from rich.console import Console
+
+if TYPE_CHECKING:
+    from src.clean.text_processor import LLMClient
 
 
 def _safe_json_loads(json_str: str):
@@ -159,9 +165,6 @@ def _extract_json_payload(content: str, prefer_array: bool = False) -> Optional[
     return _find_balanced_block(cleaned_text, open_ch, close_ch)
 
 
-from pathlib import Path
-
-
 def _dump_llm_failure(tag: str, content: str, prompt: str, reason: str) -> None:
     """LLM 调用失败时把原始 content + prompt 落盘到 data/llm_debug/，方便复现定位。
 
@@ -191,12 +194,7 @@ def _dump_llm_failure(tag: str, content: str, prompt: str, reason: str) -> None:
         console.print(f"[dim]LLM 原始响应已落盘: {out_path}")
     except Exception:
         pass
-from typing import Optional, TYPE_CHECKING
 
-from rich.console import Console
-
-if TYPE_CHECKING:
-    from src.clean.text_processor import LLMClient
 
 console = Console()
 

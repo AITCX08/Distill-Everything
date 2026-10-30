@@ -1,5 +1,4 @@
 from types import SimpleNamespace
-from pathlib import Path
 
 from fastapi import FastAPI
 
