@@ -49,12 +49,12 @@ jobs:
           python -c "import src.outputs; import src.platforms; import src.distillation"
           python -c "import src.outputs.base"
       - name: Run test suite
-        run: python -m pytest
+        run: python -m pytest --timeout=180
 
   python-windows:
     name: Python（Windows）
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
@@ -77,22 +77,23 @@ jobs:
         run: >-
           python -m pytest
           tests/application
-          tests/orchestration
           tests/distillation
           tests/outputs
           tests/platforms
-          tests/series
           tests/test_import_order.py
+          --timeout=180
           -p no:cacheprovider
-      - name: Run dashboard and document suite
+      - name: Run orchestration, dashboard and document suite
         run: >-
           python -m pytest
+          tests/orchestration
+          tests/series
           tests/dashboard
           tests/test_meeting_renderer.py
           tests/test_text_processor.py
           tests/test_knowledge_extractor.py
+          --timeout=180
           -p no:cacheprovider
-          --full-trace
 
   python-macos:
     name: Python（macOS 基础）
@@ -116,3 +117,4 @@ jobs:
           tests/dashboard/test_series_control.py
           tests/dashboard/test_artifact_api.py
           tests/outputs/test_episodes.py
+          --timeout=180
