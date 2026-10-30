@@ -20,6 +20,7 @@ from src.distillation.state import (
     migrate_state,
     utc_now_iso,
 )
+from src.fsutil import replace_with_retry
 
 
 def _fsync_directory(path: Path) -> None:
@@ -51,7 +52,7 @@ def atomic_write_bytes(
             os.fsync(stream.fileno())
         if validator is not None and not validator(temporary):
             raise ArtifactValidationError(path)
-        os.replace(temporary, path)
+        replace_with_retry(temporary, path)
         _fsync_directory(path.parent)
     finally:
         temporary.unlink(missing_ok=True)

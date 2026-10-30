@@ -71,11 +71,13 @@ def test_reconcile_marks_an_orphaned_running_series_as_paused(tmp_path):
     assert current["last_error"] == "执行器已停止，可继续任务。"
 
 
-def test_worker_liveness_treats_windows_invalid_handles_as_not_running(monkeypatch):
-    def invalid_handle(*_args):
+def test_worker_liveness_treats_a_failing_probe_as_not_running(monkeypatch):
+    """A probe that raises (Windows invalid handle, exotic OSError) means "dead"."""
+
+    def invalid_handle(_pid):
         raise SystemError("invalid handle")
 
-    monkeypatch.setattr("src.dashboard.series_control.os.kill", invalid_handle)
+    monkeypatch.setattr("src.dashboard.series_control.process_is_alive", invalid_handle)
 
     assert _worker_is_alive(99999) is False
 

@@ -73,4 +73,8 @@ class SeriesController:
 
 
 def _worker_is_alive(worker_pid: int) -> bool:
-    return process_is_alive(worker_pid)
+    try:
+        return process_is_alive(worker_pid)
+    except (OSError, SystemError):
+        # A failing probe must degrade to "not running", never crash the controller.
+        return False

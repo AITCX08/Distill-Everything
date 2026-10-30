@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
 from src.application.redaction import redact_value
+from src.fsutil import replace_with_retry, unlink_with_retry
 from src.distillation.state import utc_now_iso
 
 
@@ -213,7 +213,7 @@ def _request_stage_resource(work_dir: Path, stage: str) -> None:
     temporary = work_dir / "resource-request.tmp"
     destination = work_dir / "resource-request.json"
     temporary.write_text(json.dumps({"stage": stage}), "utf-8")
-    os.replace(temporary, destination)
+    replace_with_retry(temporary, destination)
 
 
 def _wait_for_stage_grant(work_dir: Path, stage: str, *, poll_seconds: float = 0.05) -> str | None:
@@ -233,8 +233,8 @@ def _wait_for_stage_grant(work_dir: Path, stage: str, *, poll_seconds: float = 0
 
 
 def _clear_stage_resource(work_dir: Path) -> None:
-    (work_dir / "resource-request.json").unlink(missing_ok=True)
-    (work_dir / "resource-grant.json").unlink(missing_ok=True)
+    unlink_with_retry(work_dir / "resource-request.json")
+    unlink_with_retry(work_dir / "resource-grant.json")
 
 
 def _write_checkpoint(
@@ -259,7 +259,7 @@ def _write_checkpoint(
     destination = work_dir / "checkpoint.json"
     temporary = destination.with_suffix(".tmp")
     temporary.write_text(json.dumps(checkpoint, ensure_ascii=False, sort_keys=True), "utf-8")
-    os.replace(temporary, destination)
+    replace_with_retry(temporary, destination)
     return checkpoint
 
 

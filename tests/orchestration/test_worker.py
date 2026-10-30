@@ -9,6 +9,15 @@ from src.orchestration.store import OrchestrationStore
 from src.orchestration.worker import run_worker
 
 
+def _worker_events(work_dir) -> str:
+    """Surface the worker's own failure reason when an assertion trips."""
+
+    path = work_dir / "events.jsonl"
+    if not path.exists():
+        return "worker wrote no events"
+    return path.read_text("utf-8")
+
+
 class FakePipeline:
     def __init__(self):
         self.download_calls = 0
@@ -168,7 +177,7 @@ def test_resource_controlled_worker_runs_all_stages_after_manager_grants(tmp_pat
     worker.join(timeout=5)
     assert not worker.is_alive(), "worker did not finish before the deadline"
 
-    assert result == [0]
+    assert result == [0], _worker_events(work_dir)
     assert (pipeline.download_calls, pipeline.extract_calls, pipeline.transcribe_calls) == (1, 1, 1)
     assert (pipeline.clean_calls, pipeline.summary_calls, pipeline.write_calls) == (1, 1, 1)
 
