@@ -69,8 +69,20 @@ def test_bilibili_descriptor_declares_the_browser_backed_qr_login():
     assert BilibiliAdapter.descriptor.requires_browser is True
 
 
-def test_resolve_accepts_space_url_and_rejects_video_url():
-    adapter = make_adapter()
+def test_resolve_accepts_space_url_and_direct_video_url_without_browser():
+    def request(method, url, **kwargs):
+        assert method == "GET"
+        assert url == "https://api.bilibili.com/x/web-interface/view"
+        assert kwargs["params"] == {"bvid": "BV1abc"}
+        return FakeHttpResponse(
+            200,
+            payload={
+                "code": 0,
+                "data": {"bvid": "BV1abc", "title": "直接视频"},
+            },
+        )
+
+    adapter = make_adapter(http_request=request)
 
     target = adapter.resolve("https://space.bilibili.com/42")
 
@@ -80,8 +92,9 @@ def test_resolve_accepts_space_url_and_rejects_video_url():
         canonical_url="https://space.bilibili.com/42",
         original_target="https://space.bilibili.com/42",
     )
-    with pytest.raises(TargetResolutionError):
-        adapter.resolve("https://www.bilibili.com/video/BV1abc")
+    video = adapter.resolve("https://www.bilibili.com/video/BV1abc")
+    assert video.target_type == "video"
+    assert video.creator_id == "BV1abc"
 
 
 def test_iter_items_maps_fetcher_results_to_complete_page():
@@ -197,3 +210,113 @@ def test_auth_status_rejects_an_empty_credential_cache(tmp_path):
     )
 
     assert make_adapter(config=config).auth_status().status == "missing"
+
+
+class FakeHttpResponse:
+    def __init__(self, status_code, *, headers=None, payload=None):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_matches_accepts_b23_bvid_av_and_bare_video_targets():
+    adapter = make_adapter()
+
+    for target in (
+        "https://b23.tv/qGTgQfJ",
+        "https://www.bilibili.com/video/BV1fCe76iEf8",
+        "https://m.bilibili.com/video/av123456",
+        "BV1fCe76iEf8",
+        "av123456",
+    ):
+        assert adapter.matches(target), target
+    assert not adapter.matches("123456")
+
+
+def test_resolve_b23_short_link_uses_restricted_redirect_and_metadata_api():
+    calls = []
+
+    def request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url == "https://b23.tv/qGTgQfJ":
+            return FakeHttpResponse(
+                302,
+                headers={"Location": "https://www.bilibili.com/video/BV1fCe76iEf8?p=1"},
+            )
+        assert url == "https://api.bilibili.com/x/web-interface/view"
+        assert kwargs["params"] == {"bvid": "BV1fCe76iEf8"}
+        return FakeHttpResponse(
+            200,
+            payload={
+                "code": 0,
+                "data": {
+                    "bvid": "BV1fCe76iEf8",
+                    "title": "短链视频",
+                    "desc": "说明",
+                    "duration": 90,
+                    "pubdate": 1_700_000_000,
+                    "stat": {"view": 12, "reply": 3},
+                },
+            },
+        )
+
+    adapter = make_adapter(http_request=request)
+
+    resolved = adapter.resolve("https://b23.tv/qGTgQfJ")
+
+    assert resolved.target_type == "video"
+    assert resolved.creator_id == "BV1fCe76iEf8"
+    assert resolved.canonical_url == "https://www.bilibili.com/video/BV1fCe76iEf8?p=1"
+    assert resolved.metadata["title"] == "短链视频"
+    assert calls[0][0] == "GET"
+    assert calls[0][2]["allow_redirects"] is False
+    assert all(call[1].startswith(("https://b23.tv/", "https://api.bilibili.com/" , "https://www.bilibili.com/")) for call in calls)
+
+
+def test_resolve_av_url_fetches_metadata_and_iterates_one_video():
+    def request(method, url, **kwargs):
+        assert method == "GET"
+        assert url == "https://api.bilibili.com/x/web-interface/view"
+        assert kwargs["params"] == {"aid": "123456"}
+        return FakeHttpResponse(
+            200,
+            payload={
+                "code": 0,
+                "data": {
+                    "bvid": "BV1abc234567",
+                    "aid": 123456,
+                    "title": "AV视频",
+                    "desc": "说明",
+                    "duration": 61,
+                    "stat": {"view": 7, "reply": 2},
+                },
+            },
+        )
+
+    adapter = make_adapter(http_request=request)
+    resolved = adapter.resolve("https://www.bilibili.com/video/av123456")
+    creator = adapter.get_creator(resolved)
+    page = next(adapter.iter_items(creator, checkpoint=None))
+
+    assert creator.display_name == "AV视频"
+    assert page.checkpoint.complete is True
+    assert page.items[0].item_id == "BV1abc234567"
+    assert page.items[0].title == "AV视频"
+    assert page.items[0].duration_seconds == 61
+    assert page.items[0].statistics == {"views": 7, "comments": 2}
+
+
+def test_resolve_rejects_redirect_to_untrusted_host():
+    def request(method, url, **kwargs):
+        return FakeHttpResponse(
+            302,
+            headers={"Location": "https://evil.example/video/BV1abc234567"},
+        )
+
+    adapter = make_adapter(http_request=request)
+
+    with pytest.raises(TargetResolutionError, match="不受信任的重定向主机"):
+        adapter.resolve("https://b23.tv/unsafe")

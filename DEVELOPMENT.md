@@ -111,6 +111,28 @@ CLI / Dashboard
 
 > ⚠️ `prompts/*.txt` 目前只是参考文档。**实际 Prompt 模板内嵌在 Python 源文件底部**(`TOPIC_SEGMENT_PROMPT`、`VIDEO_KNOWLEDGE_PROMPT`、`PROFILE_SYNTHESIS_PROMPT`)。修改 Prompt 时改 Python 文件,不要改 `prompts/` 目录。
 
+### 1.6 编排、Worker 与本地 Dashboard
+
+v0.4 在应用服务之上增加了一层**进程编排**，Dashboard 只是它的一个客户端：
+
+```text
+Dashboard (FastAPI + SSE, 127.0.0.1)
+  -> TaskManager（唯一持有 Worker 进程的主人）
+       -> worker 子进程（无窗口，每作品一个）
+            -> BilibiliWorkPipeline / DistillationEngine
+  -> OrchestrationStore（SQLite：任务、租约、资源闸门、事件）
+```
+
+硬约束：
+
+- **进程所有权**：同一 `DATA_DIR` 只能有一个存活的 `TaskManager`。启动时 `claim_ownership()` 读取持久化 owner 行；owner 进程已死则抢占，仍存活则拒绝启动。PID 探活必须把 `psutil.NoSuchProcess` 视为“已退出”（它继承 `psutil.Error`，**不是** `OSError`），否则非正常关闭后 Dashboard 无法再次启动。
+- **资源闸门**：Worker 只有写入 `resource-request.json` 并读到 `resource-grant.json` 后才能进入受限阶段；ASR 全局只允许一个持有者。
+- **状态可见性**：Worker 把进度写进任务私有 JSONL；服务端校验 + 脱敏后才投影为 SSE 快照。绝对路径只在本地会话保护的详情接口返回。
+- **凭据边界**：`job_state.json` 的 `creator` 只保存 `platform / creator_id / display_name / canonical_url`。`SourceCreator.raw_metadata` 是 `MappingProxyType`（不可 `asdict`/deepcopy），属于适配器内存态，**不得持久化**——需要新字段时先加白名单，不要直接 `asdict(creator)`。
+- **导入约定**：`src.outputs` / `src.platforms` / `src.distillation` 的 `__init__.py` 使用 PEP 562 惰性导出。改回即时重导出会重新形成 `outputs → platforms → distillation → outputs` 循环导入（`tests/test_import_order.py` 会失败）。
+
+Dashboard 的会话安全：固定绑定 `127.0.0.1`（`validate_host` 硬性拒绝其它地址）、随机 `distill_session` cookie、写操作要求 `X-Distill-CSRF` 与 `Origin` 同源。
+
 ---
 
 ## 2. 数据流与契约
@@ -749,3 +771,5 @@ FunASR 自身日志很详尽,`rich` 输出不会压过它。如果怀疑模型�
 | 2026-06-04 | feat/meeting-minutes-stage1 | 新增 `src/meeting/` 模块与 `meeting` 命令（飞书风格会议纪要 MD/PDF），新增 markdown/weasyprint 依赖，复用 read_document/create_llm_client/_safe_json_loads |
 | 2026-04-23 | AITCX08 | **磁盘节省工作流 + 时间戳输出 + JSON 7 轮**：`main.py::asr` 新增 `--delete-audio/--keep-audio`（默认删，转写 + 完整性双校验通过后 `unlink`）+ `--watch/--watch-interval N`（持续监听 audio 目录，FunASR 引擎只加载一次，Ctrl+C 优雅退出）；抽出 `_scan_pending_audios` / `_process_pending_batch` 两个 helper 给单次和 watch 模式共用；`crawl` 把 `data/transcripts/{bvid}.json` 完整的 BV 算入 `complete_bvids`，避免被 ASR 删音频后重复下载；推荐双终端工作流（`crawl` + `asr --watch`）让 1266 视频场景磁盘占用从 ~40GB 降至 ~3-5GB。`_safe_json_loads` 升至 7 轮（新增第 5 轮 Python/JS 字面量替换 `None/NaN/Infinity/undefined → null`、`True/False → true/false`，新增第 6 轮缺值补 `null`：`"key":, → "key":null,`，应对长上下文 LLM "Expecting value" 抖动）；`extract_from_video / merge_knowledge` 失败自动 `_dump_llm_failure` 落盘原始 content + Prompt 到 `data/llm_debug/`；`output/{name}.skill.md` 改为 `output/{name}-{YYYYMMDD-HHMMSS}.skill.md`（每次新增不覆盖，3 处生成点统一用 `_skill_output_path` helper）；新增 7 用例 `tests/test_asr_pipeline.py`（共 111 单测）|
 | 2026-06-05 | feat/meeting-minutes-stage2 | **阶段二音频路径**：`FunASREngine.__init__` 新增 `spk_model: Optional[str] = None`（传 `"cam++"` 启用说话人分离），`TranscriptSegment` 新增 `speaker: str = ""`，解析逻辑提取为模块级纯函数 `_parse_result_segments` / `_spk_label`；新增 `src/meeting/audio_transcriber.py`（`convert_to_wav16k` ffmpeg 转码 + `audio_to_transcript` FunASR cam++ + `_merge_consecutive` 相邻同说话人合并 + `_fmt_ts` 时间戳格式化）；`main.py::meeting` 新增 `_AUDIO_SUFFIXES` 按后缀分流音频/txt，音频路径产出带「说话人 N」标注的 MD+PDF；现有 `asr` 命令行为不变 |
+| 2026-08-12 | AITCX08 | **v0.4 多平台与本地 Dashboard**：新增 `src/platforms/`（Bilibili/抖音 Source Adapter + 显式 registry）、`src/application/`（命令/查询/revision/events/job lease）、`src/distillation/`（3/1/3 受控引擎、原子状态、双 ETA）、`src/outputs/`（episodes/skill/rag 可组合输出）、`src/orchestration/`（`TaskManager` + 无窗口 Worker + 资源闸门 + SQLite 租约）、`src/dashboard/`（FastAPI + SSE + 会话/CSRF/Origin 校验 + React 作战台）；跨平台主键统一为 `<platform>_<item_id>`；新增「1.6 编排、Worker 与本地 Dashboard」章节 |
+| 2026-08-13 | AITCX08 | **开源发布加固**：`src.outputs` / `src.platforms` / `src.distillation` 三包改 PEP 562 惰性导出，修复 `pytest tests/outputs` 的循环导入崩溃；`engine` 改用 `creator_record()` 写 `job_state.json`，`SourceCreator.raw_metadata`（mappingproxy）不再参与 `asdict`/持久化；`_default_pid_probe` 捕获 `psutil.Error`，非正常关闭后 Dashboard 可重新启动；新增 `tests/test_import_order.py` 与引擎/编排回归用例，补齐 `pyproject.toml`（pytest/ruff/coverage）与 Windows CI |

@@ -1,5 +1,11 @@
 # Distill-Everything
 
+[![pytest](https://github.com/AITCX08/Distill-Everything/actions/workflows/pytest.yml/badge.svg)](https://github.com/AITCX08/Distill-Everything/actions/workflows/pytest.yml)
+[![Dashboard](https://github.com/AITCX08/Distill-Everything/actions/workflows/dashboard.yml/badge.svg)](https://github.com/AITCX08/Distill-Everything/actions/workflows/dashboard.yml)
+[![CodeQL](https://github.com/AITCX08/Distill-Everything/actions/workflows/codeql.yml/badge.svg)](https://github.com/AITCX08/Distill-Everything/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB.svg)](./requirements.txt)
+
 > Worker 编排运行时：每个作品由一个隔离的子进程执行完整流水线。浏览器只控制本地任务；不会收到 Cookie、命令行、PID、二维码载荷或原始 Worker 输出。保存目录仅能在当前本地会话保护的创建确认与任务交付详情中查看。发布架构见 `docs/superpowers/specs/2026-08-09-worker-orchestrated-distillation-design.md`。
 
 ## Dashboard Worker 工作流
@@ -15,6 +21,7 @@
 - 默认限制为两个流水线 Worker、两个下载、一个 ASR 阶段和一个 LLM 阶段。Worker 只有取得 `TaskManager` 发放的阶段许可后才会消耗受限资源。
 - Dashboard 只绑定 `127.0.0.1`。Cookie、二维码载荷、凭据、命令行、PID 和原始 Worker 输出不会进入浏览器、SSE 或日志。
 - Worker 进度保存在任务私有 JSONL 中，服务端先校验和脱敏，再投影为紧凑的 SSE 快照。
+- **数据出网边界**：转写在本机完成（FunASR）。清洗、摘要与知识提取会把相应文本发送到你配置的 LLM 端点；首次运行 FunASR 会从 ModelScope 下载模型权重。需要完全离线时设置 `LLM_PROVIDER=ollama` 并预先缓存模型。
 
 Dashboard 始终是本地单用户工具：广泛订阅的任务列表、SSE 和实时日志只包含脱敏状态；绝对保存目录只可通过本地会话保护的详情接口提供给当前页面。
 
@@ -29,6 +36,7 @@ Distill-Everything 是一个本地优先的内容蒸馏工具。它可以从创�
 | Windows CLI、Dashboard 与本地工作流 | 正式支持 | Dashboard 仅监听 `127.0.0.1`。 |
 | macOS 安装、CLI、Dashboard 与基础 CI | 正式文档支持 | 使用前台 Dashboard 命令；详细限制见[平台支持与故障排查](./docs/平台支持与故障排查.md)。 |
 | Bilibili / 抖音扫码、Playwright 浏览器 | 需要设备验收 | 不承诺未经真实设备验证的平台登录稳定性。 |
+| YouTube（`@handle`、`/channel/UC…`、单视频） | 实验性 | 走 `yt-dlp`，公开内容无需登录；不处理会员、付费或需登录的视频。 |
 | Apple Silicon FunASR MPS | 需要设备验收 | 不承诺与 CUDA 或 CPU 相同的性能和稳定性。 |
 
 公开 issue、截图和日志中不得包含 Cookie、二维码、浏览器 profile、API Key、媒体原文件、真实任务标题或本地绝对路径。
@@ -45,7 +53,7 @@ Distill-Everything 是一个本地优先的内容蒸馏工具。它可以从创�
 
 ## 核心能力
 
-- **多平台创作者蒸馏**：通过统一的 Source Adapter 接入 Bilibili、抖音；后续可扩展小红书等平台。
+- **多平台创作者蒸馏**：通过统一的 Source Adapter 接入 Bilibili、抖音与 YouTube；`--platform auto` 按链接自动选平台，新增平台只需实现并注册适配器。
 - **双输出形态**：每件作品生成独立 Markdown（episodes），也可聚合为一个 `SKILL.md`；两者可同时生成。
 - **可恢复流水线**：任务状态、产物哈希与阶段进度持久化；中断后从最近的有效阶段恢复，支持单项重试。
 - **真实进度与本地 Dashboard**：下载字节进度、阶段进度、ETA、实时 trace、暂停/恢复/取消和产物预览。
@@ -172,6 +180,17 @@ python main.py source creator "https://www.douyin.com/user/SEC_UID"
 
 # Bilibili 走同一入口
 python main.py source creator "https://space.bilibili.com/12345678" --platform bilibili
+
+# 直接蒸馏 Bilibili 单个视频（支持 b23.tv、BV 和 av）
+python main.py source creator "https://b23.tv/短链" --platform bilibili
+python main.py source creator "BV1xxxxxxxxxxxx" --platform bilibili
+
+# YouTube：频道或单个视频（走 yt-dlp，公开内容无需登录）
+python main.py source creator "https://www.youtube.com/@handle" --platform youtube
+python main.py source creator "https://youtu.be/VIDEO_ID"
+
+# 不给 --platform 时按链接自动识别平台（默认 auto）
+python main.py source creator "https://www.youtube.com/@handle"
 ```
 
 常用选项：
@@ -196,9 +215,9 @@ python main.py source creator "<创作者主页>" \
 
 Dashboard 是单用户、本地作战台，使用 FastAPI + SSE + React。它和 CLI 复用同一个 `DistillationService`、任务状态和事件流。
 
-![脱敏的 Dashboard 公开演示界面](./docs/images/dashboard-workbench.png)
+![空工作台实拍：任务概览、作品执行队列与创建入口](./docs/images/dashboard-workbench.png)
 
-*公开演示界面，仅展示模板状态；不包含真实任务、平台标识、保存位置或登录信息。*
+*本机真实界面实拍（1600×1000，空工作台状态）；不含真实任务、平台标识、保存位置或登录信息。*
 
 | 平台 | 启动方式 |
 | --- | --- |

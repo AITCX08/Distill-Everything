@@ -11,6 +11,9 @@ from collections.abc import Callable, Iterator, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin, urlsplit
+
+import requests
 
 from src.crawl.audio_download import (
     download_audio_with_progress,
@@ -39,6 +42,20 @@ _SPACE_URL_RE = re.compile(
     re.IGNORECASE,
 )
 _EXPLICIT_UID_RE = re.compile(r"^bilibili:(?P<uid>\d+)$", re.IGNORECASE)
+_BARE_BVID_RE = re.compile(r"^(?P<bvid>BV[0-9A-Za-z]+)$", re.IGNORECASE)
+_BARE_AV_RE = re.compile(r"^av(?P<aid>\d+)$", re.IGNORECASE)
+_B23_HOSTS = frozenset({"b23.tv", "www.b23.tv"})
+_BILIBILI_VIDEO_HOSTS = frozenset(
+    {"bilibili.com", "www.bilibili.com", "m.bilibili.com"}
+)
+_ALLOWED_REDIRECT_HOSTS = _B23_HOSTS | _BILIBILI_VIDEO_HOSTS
+_VIDEO_PATH_RE = re.compile(
+    r"^/video/(?P<identifier>BV[0-9A-Za-z]+|av\d+)(?:/)?$",
+    re.IGNORECASE,
+)
+_BILIBILI_VIEW_API = "https://api.bilibili.com/x/web-interface/view"
+_HTTP_TIMEOUT_SECONDS = 10
+_MAX_REDIRECTS = 4
 
 
 def legacy_source_id(value: str) -> str:
@@ -52,7 +69,12 @@ class BilibiliAdapter:
 
     descriptor = PlatformDescriptor(
         name="bilibili",
-        url_patterns=(r"https?://space\.bilibili\.com/\d+",),
+        url_patterns=(
+            r"https?://space\.bilibili\.com/\d+",
+            r"https?://(?:www\.)?b23\.tv/[^\s]+",
+            r"https?://(?:www\.|m\.)?bilibili\.com/video/(?:BV|av)[^\s]+",
+            r"(?:BV[0-9A-Za-z]{4,}|av\d+)",
+        ),
         item_types=frozenset({ItemType.VIDEO}),
         requires_browser=True,
         requires_auth=True,
@@ -69,6 +91,7 @@ class BilibiliAdapter:
         cookies_factory: Callable = generate_cookies_file,
         login_fn: Callable = run_qrcode_login,
         credential_saver: Callable = save_credential,
+        http_request: Callable[..., Any] | None = None,
     ):
         self._config = config
         self._credential_provider = credential_provider
@@ -77,9 +100,14 @@ class BilibiliAdapter:
         self._cookies_factory = cookies_factory
         self._login_fn = login_fn
         self._credential_saver = credential_saver
+        self._http_request = http_request or requests.request
 
     def matches(self, target: str) -> bool:
-        return bool(_SPACE_URL_RE.match(target) or _EXPLICIT_UID_RE.match(target))
+        return bool(
+            _SPACE_URL_RE.match(target.strip())
+            or _EXPLICIT_UID_RE.match(target.strip())
+            or _is_video_target(target)
+        )
 
     def auth_status(self) -> AuthStatus:
         config = self._config.bilibili
@@ -107,20 +135,42 @@ class BilibiliAdapter:
         self._credential_saver(credential, buvid3, self._config.credentials_cache)
 
     def resolve(self, target: str) -> ResolvedTarget:
+        target = target.strip()
         match = _SPACE_URL_RE.match(target) or _EXPLICIT_UID_RE.match(target)
+        if match:
+            creator_id = match.group("uid")
+            return ResolvedTarget(
+                platform="bilibili",
+                creator_id=creator_id,
+                canonical_url=f"https://space.bilibili.com/{creator_id}",
+                original_target=target,
+            )
+
+        if _is_video_target(target):
+            bvid, canonical_url, metadata = self._resolve_video_target(target)
+            return ResolvedTarget(
+                platform="bilibili",
+                creator_id=bvid,
+                canonical_url=canonical_url,
+                original_target=target,
+                target_type="video",
+                metadata=metadata,
+            )
+
         if not match:
             raise TargetResolutionError(
-                "Bilibili creator targets must use a space.bilibili.com URL"
+                "Bilibili targets must use a space.bilibili.com, b23.tv, BV or av URL"
             )
-        creator_id = match.group("uid")
-        return ResolvedTarget(
-            platform="bilibili",
-            creator_id=creator_id,
-            canonical_url=f"https://space.bilibili.com/{creator_id}",
-            original_target=target,
-        )
 
     def get_creator(self, target: ResolvedTarget) -> SourceCreator:
+        if target.target_type == "video":
+            return SourceCreator(
+                platform="bilibili",
+                creator_id=target.creator_id,
+                display_name=str(target.metadata.get("title") or target.creator_id),
+                canonical_url=target.canonical_url,
+                raw_metadata=target.metadata,
+            )
         return SourceCreator(
             platform="bilibili",
             creator_id=target.creator_id,
@@ -134,6 +184,19 @@ class BilibiliAdapter:
         *,
         checkpoint: EnumerationCheckpoint | None,
     ) -> Iterator[EnumerationPage]:
+        if _is_video_url(creator.canonical_url):
+            item = self.map_video(creator.raw_metadata, creator.creator_id)
+            yield EnumerationPage(
+                items=(item,),
+                checkpoint=EnumerationCheckpoint(
+                    seen_ids=frozenset({item.item_id}),
+                    complete=True,
+                    expected_count=1,
+                ),
+                has_more=False,
+            )
+            return
+
         credential, _ = self._credential_provider(self._config)
         seen_ids = set(checkpoint.seen_ids) if checkpoint else set()
         fetched = self._video_fetcher(
@@ -221,11 +284,22 @@ class BilibiliAdapter:
         raw: Mapping[str, Any],
         creator_id: str,
     ) -> SourceItem:
-        bvid = str(raw["bvid"])
+        bvid = _normalize_bvid(raw.get("bvid"))
+        if not bvid:
+            raise TargetResolutionError("Bilibili metadata did not contain a valid BV id")
         timestamp = raw.get("pubdate")
         published_at = None
         if isinstance(timestamp, (int, float)) and timestamp > 0:
             published_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+        stat = raw.get("stat")
+        stat = stat if isinstance(stat, Mapping) else {}
+        duration = raw.get("duration_seconds", raw.get("duration", 0))
+        duration_seconds = (
+            float(duration)
+            if isinstance(duration, (int, float))
+            else parse_duration_str(str(duration or "0"))
+        )
 
         return SourceItem(
             platform="bilibili",
@@ -233,16 +307,231 @@ class BilibiliAdapter:
             creator_id=creator_id,
             item_type=ItemType.VIDEO,
             title=str(raw.get("title") or bvid),
-            description=str(raw.get("description") or ""),
+            description=str(raw.get("description") or raw.get("desc") or ""),
             canonical_url=f"https://www.bilibili.com/video/{bvid}",
             published_at=published_at,
-            duration_seconds=parse_duration_str(str(raw.get("duration") or "0")),
+            duration_seconds=duration_seconds,
             statistics={
-                "views": int(raw.get("view_count") or 0),
-                "comments": int(raw.get("comment_count") or 0),
+                "views": int(raw.get("view_count") or stat.get("view") or 0),
+                "comments": int(raw.get("comment_count") or stat.get("reply") or 0),
             },
+            cover_url=str(raw.get("cover") or raw.get("pic") or "") or None,
+            tags=_normalize_tags(raw.get("tags")),
             raw_metadata=dict(raw),
         )
+
+    def _resolve_video_target(
+        self,
+        target: str,
+    ) -> tuple[str, str, Mapping[str, Any]]:
+        """Resolve a direct video target without launching a browser."""
+
+        normalized = _normalize_video_input(target)
+        if normalized is None:
+            raise TargetResolutionError(
+                "Bilibili video target must be a b23.tv link, BV id, av id or video URL"
+            )
+
+        source_url, identifier = normalized
+        if source_url is not None and _is_b23_url(source_url):
+            source_url = self._follow_redirects(source_url)
+            parsed = _extract_video_identifier(source_url)
+            if parsed is None:
+                raise TargetResolutionError(
+                    "b23.tv 短链未重定向到可识别的 Bilibili 视频地址"
+                )
+            identifier = parsed
+
+        kind, value = identifier
+        metadata = self._fetch_video_metadata(kind, value)
+        bvid = _normalize_bvid(metadata.get("bvid"))
+        if not bvid:
+            raise TargetResolutionError("Bilibili metadata did not contain a valid BV id")
+        return bvid, _canonical_video_url(bvid, source_url), metadata
+
+    def _follow_redirects(self, url: str) -> str:
+        current = url
+        for _ in range(_MAX_REDIRECTS + 1):
+            _validate_redirect_url(current)
+            try:
+                response = self._http_request(
+                    "GET",
+                    current,
+                    allow_redirects=False,
+                    stream=True,
+                    timeout=_HTTP_TIMEOUT_SECONDS,
+                    headers={"User-Agent": "Distill-Everything/1.0"},
+                )
+            except requests.RequestException as error:
+                raise TargetResolutionError("Bilibili 短链请求失败") from error
+            status = int(getattr(response, "status_code", 0) or 0)
+            try:
+                if status in {301, 302, 303, 307, 308}:
+                    location = (getattr(response, "headers", {}) or {}).get("Location")
+                    if not location:
+                        raise TargetResolutionError("b23.tv 重定向缺少 Location")
+                    next_url = urljoin(current, str(location))
+                    _validate_redirect_url(next_url)
+                    if _extract_video_identifier(next_url) is not None:
+                        return next_url
+                    current = next_url
+                    continue
+                if status < 200 or status >= 400:
+                    raise TargetResolutionError(f"短链解析失败，HTTP 状态码: {status}")
+                return current
+            finally:
+                close = getattr(response, "close", None)
+                if callable(close):
+                    close()
+        raise TargetResolutionError("短链重定向次数超过安全上限")
+
+    def _fetch_video_metadata(self, kind: str, value: str) -> Mapping[str, Any]:
+        try:
+            response = self._http_request(
+                "GET",
+                _BILIBILI_VIEW_API,
+                params={"bvid" if kind == "bvid" else "aid": value},
+                timeout=_HTTP_TIMEOUT_SECONDS,
+                headers={"User-Agent": "Distill-Everything/1.0"},
+            )
+        except requests.RequestException as error:
+            raise TargetResolutionError("Bilibili 元数据请求失败") from error
+        status = int(getattr(response, "status_code", 0) or 0)
+        if status < 200 or status >= 300:
+            raise TargetResolutionError(f"Bilibili 元数据接口失败，HTTP 状态码: {status}")
+        try:
+            payload = response.json()
+        except (TypeError, ValueError, AttributeError) as error:
+            raise TargetResolutionError("Bilibili 元数据接口返回了无效 JSON") from error
+        if not isinstance(payload, Mapping) or payload.get("code") not in {0, None}:
+            message = payload.get("message") if isinstance(payload, Mapping) else ""
+            suffix = f": {message}" if message else ""
+            raise TargetResolutionError(f"Bilibili 元数据接口拒绝请求{suffix}")
+        data = payload.get("data") if isinstance(payload, Mapping) else None
+        if not isinstance(data, Mapping):
+            raise TargetResolutionError("Bilibili 元数据接口未返回视频数据")
+        return dict(data)
+
+
+def _normalize_bvid(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    match = _BARE_BVID_RE.fullmatch(value)
+    if not match:
+        return None
+    return "BV" + value[2:]
+
+
+def _normalize_tags(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,) if value.strip() else ()
+    if not isinstance(value, (list, tuple)):
+        return ()
+    tags: list[str] = []
+    for tag in value:
+        if isinstance(tag, Mapping):
+            normalized = tag.get("tag_name") or tag.get("name")
+        else:
+            normalized = tag
+        if normalized is not None and str(normalized).strip():
+            tags.append(str(normalized))
+    return tuple(tags)
+
+
+def _normalize_video_input(
+    target: str,
+) -> tuple[str | None, tuple[str, str]] | None:
+    value = target.strip()
+    bare_bvid = _BARE_BVID_RE.fullmatch(value)
+    if bare_bvid:
+        return None, ("bvid", _normalize_bvid(value) or value)
+    bare_av = _BARE_AV_RE.fullmatch(value)
+    if bare_av:
+        return None, ("aid", bare_av.group("aid"))
+
+    parsed_value = value
+    if "://" not in parsed_value:
+        parsed_value = f"https://{parsed_value}"
+    try:
+        parsed = urlsplit(parsed_value)
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host in _B23_HOSTS:
+        if parsed.scheme not in {"http", "https"} or not parsed.path.strip("/"):
+            return None
+        return parsed_value, ("short", parsed_value)
+    if host not in _BILIBILI_VIDEO_HOSTS:
+        return None
+    identifier = _extract_video_identifier(parsed_value)
+    return (parsed_value, identifier) if identifier is not None else None
+
+
+def _extract_video_identifier(url: str) -> tuple[str, str] | None:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in _BILIBILI_VIDEO_HOSTS:
+        return None
+    match = _VIDEO_PATH_RE.fullmatch(parsed.path.rstrip("/"))
+    if not match:
+        return None
+    identifier = match.group("identifier")
+    if identifier.lower().startswith("bv"):
+        return "bvid", _normalize_bvid(identifier) or identifier
+    return "aid", identifier[2:]
+
+
+def _is_b23_url(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
+    return (parsed.hostname or "").lower() in _B23_HOSTS
+
+
+def _is_video_url(url: str) -> bool:
+    return _extract_video_identifier(url) is not None
+
+
+def _is_video_target(target: str) -> bool:
+    value = target.strip()
+    if _BARE_BVID_RE.fullmatch(value) or _BARE_AV_RE.fullmatch(value):
+        return True
+    normalized = _normalize_video_input(value)
+    return bool(
+        normalized is not None
+        and (
+            normalized[0] is not None
+            and _is_b23_url(normalized[0])
+            or normalized[1][0] in {"bvid", "aid"}
+        )
+    )
+
+
+def _validate_redirect_url(url: str) -> None:
+    try:
+        parsed = urlsplit(url)
+    except ValueError as error:
+        raise TargetResolutionError("短链重定向地址格式无效") from error
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"http", "https"} or host not in _ALLOWED_REDIRECT_HOSTS:
+        raise TargetResolutionError(f"不受信任的重定向主机: {host or '<empty>'}")
+
+
+def _canonical_video_url(bvid: str, source_url: str | None) -> str:
+    suffix = ""
+    if source_url:
+        try:
+            query = urlsplit(source_url).query
+        except ValueError:
+            query = ""
+        if query:
+            suffix = f"?{query}"
+    return f"https://www.bilibili.com/video/{bvid}{suffix}"
 
 
 def _has_usable_cached_credential(path: Path) -> bool:

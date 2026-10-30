@@ -74,7 +74,7 @@ export function AppShell({ children, activeWorkspace = "mission" }: PropsWithChi
     <main className="dashboard-main">{children}</main>
     <footer className="dashboard-footer">
       <Text><strong>开源</strong><span aria-hidden="true">·</span><strong>本地优先</strong><span aria-hidden="true">·</span><strong>隐私保护</strong></Text>
-      <Text>你的内容，只在你的设备上处理。</Text>
+      <Text>转写在本机完成；摘要文本会发送给你配置的 LLM 提供商，选择 Ollama 可全程离线。</Text>
       <a href="https://github.com/AITCX08/Distill-Everything">项目地址</a>
       <a href="https://github.com/AITCX08/Distill-Everything#readme">文档</a>
     </footer>

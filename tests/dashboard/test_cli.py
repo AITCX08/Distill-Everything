@@ -4,6 +4,48 @@ from types import SimpleNamespace
 import main
 
 
+def test_source_platforms_lists_every_registered_adapter(monkeypatch):
+    """The CLI must enumerate the registry, so a new adapter needs no CLI edit."""
+
+    class Descriptor:
+        def __init__(self, name):
+            self.name = name
+            self.item_types = ()
+            self.requires_browser = False
+            self.requires_auth = False
+
+    class Manager:
+        def list_descriptors(self):
+            return (Descriptor("bilibili"), Descriptor("douyin"), Descriptor("youtube"))
+
+    monkeypatch.setattr(main, "build_platform_manager", lambda config: Manager())
+    monkeypatch.setattr(main, "load_config", lambda: object(), raising=False)
+
+    result = CliRunner().invoke(main.cli, ["source", "platforms"])
+
+    assert result.exit_code == 0, result.output
+    assert "youtube" in result.output
+
+
+def test_source_status_rejects_unknown_platform_with_the_available_list(monkeypatch):
+    class Manager:
+        def get(self, platform):
+            from src.platforms.errors import UnknownPlatformError
+
+            raise UnknownPlatformError(platform)
+
+        def list_descriptors(self):
+            return (SimpleNamespace(name="bilibili"), SimpleNamespace(name="youtube"))
+
+    monkeypatch.setattr(main, "build_platform_manager", lambda config: Manager())
+    monkeypatch.setattr(main, "load_config", lambda: object(), raising=False)
+
+    result = CliRunner().invoke(main.cli, ["source", "status", "xiaohongshu"])
+
+    assert result.exit_code != 0
+    assert "bilibili, youtube" in result.output
+
+
 def test_dashboard_cli_uses_no_open_and_exposes_no_host_option(monkeypatch):
     service = object()
     captured = []

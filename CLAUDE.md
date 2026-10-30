@@ -15,6 +15,8 @@
 | 2026-06-04 | 新增会议纪要：`src/meeting/`（飞书妙记文字记录 txt → 智能纪要），`meeting` CLI 命令，MD + PDF（weasyprint，需 brew install pango）输出，复用 reader/LLM 工厂/JSON 容错；阶段一仅 txt 路径，音频+说话人分离留阶段二 |
 | 2026-06-05 | 会议纪要阶段二：音频路径。`FunASREngine` 加 cam++ 说话人分离（`spk_model` + `TranscriptSegment.speaker`）；新增 `src/meeting/audio_transcriber.py`（ffmpeg 转码 + FunASR）；`meeting` 命令按后缀分流音频/txt，音频产出带「说话人 N」的 MD+PDF |
 | 2026-06-23 | 飞书妙记 Stage 1：新增 `src/feishu/`（client/minutes/errors，raw requests 下载妙记录音）+ `feishu-meeting` CLI 命令（链接→下载→本地转写→MD/PDF）；抽出 `src/meeting/pipeline.py` 供 meeting/feishu-meeting 复用 |
+| 2026-08-12 | v0.4 大版本：新增 `src/platforms/`（Bilibili/抖音 Source Adapter）、`src/application/`（命令/查询/revision/events/lease）、`src/distillation/`（3/1/3 引擎 + 原子状态）、`src/outputs/`（episodes/skill/rag）、`src/orchestration/`（TaskManager + 受控 Worker）、`src/dashboard/`（FastAPI + SSE + React 作战台）；产品改名 Distill-Everything |
+| 2026-08-13 | 开源发布加固：三个包改为 PEP 562 惰性导出修复循环导入；`SourceCreator.raw_metadata` 不再进 `job_state.json`（mappingproxy 不可 asdict/deepcopy）；`psutil.NoSuchProcess` 不再阻塞 Dashboard 启动；新增 `tests/test_import_order.py`、ruff 配置与 Windows CI；文档同步到 0.4.0 |
 
 ---
 
@@ -108,8 +110,14 @@ graph TD
 | `src/reader/` | 文档蒸馏入口：PDF/DOCX/TXT → cleaned JSON | `document_to_cleaned()`, `read_document()` | [CLAUDE.md](./src/reader/CLAUDE.md) |
 | `src/meeting/` | 会议纪要：飞书文字记录 txt → 智能纪要（MD+PDF） | `parse_feishu_txt`, `MeetingMinutesGenerator`, `render_markdown/render_pdf` | [CLAUDE.md](./src/meeting/CLAUDE.md) |
 | `src/feishu/` | 飞书开放平台集成（Stage 1：妙记录音下载） | `FeishuClient`, `download_minute_media`, `extract_minute_token` | [CLAUDE.md](./src/feishu/CLAUDE.md) |
+| `src/platforms/` | 跨平台 Source Adapter（匹配/登录/枚举/下载） | `PlatformAdapter`, `PlatformRegistry`, `BilibiliAdapter`, `DouyinAdapter` | 见 `DEVELOPMENT.md` 1.5 |
+| `src/application/` | 应用服务层：命令、查询、revision 冲突、事件、job lease | `DistillationService`, `JobCommands`, `JobQueries` | 见 `DEVELOPMENT.md` 1.5 |
+| `src/distillation/` | 受控流水线引擎、原子状态、进度与 ETA | `DistillationEngine`, `JobStateStore`, `ProgressTracker` | 见 `DEVELOPMENT.md` 1.5 |
+| `src/outputs/` | 可组合输出：episodes / skill / rag | `OutputRegistry`, `OutputManager` | 见 `DEVELOPMENT.md` 1.5 |
+| `src/orchestration/` | TaskManager 与无窗口 Worker 进程、资源闸门 | `TaskManager`, `OrchestrationStore` | 见 `DEVELOPMENT.md` 1.6 |
+| `src/dashboard/` | 本地 Dashboard：FastAPI + SSE + 会话安全 | `create_dashboard_app`, `validate_host` | 见 `DEVELOPMENT.md` 1.6 |
 | `templates/skill.md.j2` | SKILL.md Jinja2 模板（nuwa-skill 风格） | -- | 见 `src/generate/CLAUDE.md` |
-| `tests/` | `auth.py` + `audio_download.py` 单元测试（pytest） | `tests/test_auth.py`, `tests/test_audio_download.py` | -- |
+| `tests/` | pytest 全量用例（约 420），含导入顺序回归 | `tests/test_import_order.py` | 见「测试策略」 |
 
 ---
 
@@ -124,10 +132,11 @@ graph TD
 
 ### 环境
 
-- macOS + venv（目录名 `Distill-Everything/`，已 .gitignore；Python 3.11）
-- PyTorch 2.8.0（pip 安装，支持 MPS）
-- ffmpeg via Homebrew（`/opt/homebrew/bin/ffmpeg`）
-- yt-dlp 需在 PATH 中（`pip install yt-dlp` 或 Homebrew）
+- **主支持平台 Windows**（PowerShell + venv），macOS 为文档支持（见 `docs/平台支持与故障排查.md`）。
+- Python 3.11（CI 矩阵 3.11；`requirements.txt` 是运行期依赖，`requirements-dev.txt` 是 pytest/ruff）。
+- PyTorch 走 CPU 轮子即可跑测试：`pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`。
+- ffmpeg 必须在 PATH（Windows `winget install ffmpeg`，macOS `brew install ffmpeg`）。
+- 抖音适配器需要 `playwright install chromium`；不想下载浏览器时可复用本机 Chrome/Edge 通道。
 
 ### 快速命令
 
@@ -161,24 +170,24 @@ python main.py distill --file /path/to/book.pdf --name "张三" --llm deepseek
 
 ## 测试策略
 
-**当前状态**：`tests/` 目录存在，使用 pytest。覆盖范围有限：
+**当前状态**：`tests/` 约 420 个用例，pytest 收集；`pyproject.toml` 已配置 `testpaths`。CI 矩阵：Ruff + Linux + Windows + macOS 基础。
 
-| 测试文件 | 覆盖对象 | 备注 |
-|---|---|---|
-| `tests/test_auth.py` | `src/crawl/auth.py`：`save_credential` / `load_cached_credential` / `get_credential`（三级策略） | 全程用 mock 隔离 `bilibili_api` |
-| `tests/test_audio_download.py` | `src/crawl/audio_download.py`：`generate_cookies_file`（Netscape 格式、7 列校验） | 未测 subprocess 分支 |
-
-跑测试：
 ```bash
-pytest tests/ -v
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest          # 全量
+ruff check src tests main.py scripts
 ```
 
-**未覆盖（高价值补齐点）**：
-- `_safe_json_loads`（`src/model/knowledge_extractor.py`）5 轮修复场景
-- `check_*_integrity` 系列（四个阶段共 4 个函数）
-- `parse_stages`（`main.py`）
-- `src/clean/text_processor.py::remove_filler_words` 中英混合边界
-- 端到端：小样本 `python main.py run --uid <uid> --max-videos 2`
+Windows 桌面端若遇到长命令流不稳定，可用项目自带的后台运行器（`scripts/run-pytest-background.cmd`），它把日志写进 `.local-artifacts/test-runs/`；普通终端直接 `python -m pytest` 即可。
+
+**已覆盖**：`src/application`、`src/orchestration`、`src/distillation`、`src/outputs`、`src/platforms`（含 Bilibili / 抖音适配器）、`src/dashboard`（API/SSE/安全）、`src/model`、`src/meeting`、`src/feishu`。
+
+**导入顺序回归**：`tests/test_import_order.py` 用子进程逐个导入各包。`src.outputs` / `src.platforms` / `src.distillation` 的导出是惰性的（PEP 562），**不要在 `__init__.py` 里改回即时重导出**，否则会重新形成
+`outputs → platforms → distillation → outputs` 循环导入（历史上导致 `pytest tests/outputs` 直接 collection error）。
+
+**仍值得补**：
+- 真实设备上的抖音扫码与 Apple Silicon MPS 验收（CI 不覆盖）
+- `main.py` 端到端小样本（需要真实凭据）
 
 ---
 

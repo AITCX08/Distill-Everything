@@ -7,11 +7,15 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: dashboard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dashboard:
     name: Dashboard（Node 24）
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,12 +26,9 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: dashboard
         run: npm ci
-      - name: Run focused dashboard tests
+      - name: Run dashboard unit tests
         working-directory: dashboard
-        run: >-
-          node node_modules/vitest/vitest.mjs run
-          src/app/AppShell.test.tsx
-          src/features/mission-control/TaskControlCard.test.tsx
+        run: node node_modules/vitest/vitest.mjs run
       - name: Type-check dashboard
         working-directory: dashboard
         run: node node_modules/typescript/bin/tsc -b

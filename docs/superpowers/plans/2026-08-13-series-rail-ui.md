@@ -14,7 +14,7 @@
 - 不修改后端接口、状态计算顺序、任务数据模型或作品排序。
 - 不增加动画库、图标库或其他依赖。
 - 单主代理串行开发，不启动子代理，不运行 `pytest`。
-- Windows 本地验证使用 `C:\Coding\node\node.exe` 直接运行前端工具，不打开可见 CMD 窗口。
+- Windows 本地验证使用 `<node>\node.exe` 直接运行前端工具，不打开可见 CMD 窗口。
 
 ---
 
@@ -54,7 +54,7 @@
   在 `dashboard` 目录运行：
 
   ```powershell
-  & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
+  & '<node>\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
   ```
 
   预期：新增用例失败，原因是节点尚无 `title` 和状态标记；原有点击用例继续通过。
@@ -142,7 +142,7 @@
 - [x] **步骤 2：运行定向测试并确认转绿**
 
   ```powershell
-  & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
+  & '<node>\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
   ```
 
   预期：`SeriesRail.test.tsx` 全部通过，无错误或警告。
@@ -193,9 +193,9 @@
 - [x] **步骤 2：运行组件测试和前端构建**
 
   ```powershell
-  & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
-  & 'C:\Coding\node\node.exe' '.\node_modules\typescript\bin\tsc' -b
-  & 'C:\Coding\node\node.exe' '.\node_modules\vite\bin\vite.js' build
+  & '<node>\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
+  & '<node>\node.exe' '.\node_modules\typescript\bin\tsc' -b
+  & '<node>\node.exe' '.\node_modules\vite\bin\vite.js' build
   ```
 
   预期：测试通过，TypeScript 编译成功，Vite 生成 `dist` 且无错误。
@@ -234,9 +234,9 @@
 - [x] **步骤 1：运行前端定向测试和构建复验**
 
   ```powershell
-  & 'C:\Coding\node\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
-  & 'C:\Coding\node\node.exe' '.\node_modules\typescript\bin\tsc' -b
-  & 'C:\Coding\node\node.exe' '.\node_modules\vite\bin\vite.js' build
+  & '<node>\node.exe' '.\node_modules\vitest\vitest.mjs' run 'src/features/mission-control/SeriesRail.test.tsx'
+  & '<node>\node.exe' '.\node_modules\typescript\bin\tsc' -b
+  & '<node>\node.exe' '.\node_modules\vite\bin\vite.js' build
   ```
 
   预期：所有命令退出码为 0。

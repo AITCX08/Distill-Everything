@@ -2,7 +2,7 @@
 
 ## 目标
 
-最终只保留 `C:\Users\Administrator\Desktop\Vibe\Distill-Everything` 一个项目目录，同时保证本地独有提交、Dashboard 未提交修改、任务数据、输出产物和隐藏运行日志均可恢复。
+最终只保留 `<workspace>\Distill-Everything` 一个项目目录，同时保证本地独有提交、Dashboard 未提交修改、任务数据、输出产物和隐藏运行日志均可恢复。
 
 ## 当前状态
 

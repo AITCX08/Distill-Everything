@@ -132,11 +132,27 @@ def cli():
     pass
 
 
+def _require_platform(manager, platform: str):
+    """Resolve a platform by name, listing the registered ones on a typo."""
+
+    from src.platforms.errors import UnknownPlatformError
+
+    try:
+        return manager.get(platform)
+    except UnknownPlatformError as exc:
+        names = ", ".join(item.name for item in manager.list_descriptors())
+        raise click.BadParameter(
+            f"未注册的平台 {platform!r}；可选：{names}",
+            param_hint="platform",
+        ) from exc
+
+
 def build_platform_manager(config):
     from src.platforms.bilibili import BilibiliAdapter
     from src.platforms.douyin import DouyinAdapter, DouyinSession
     from src.platforms.manager import PlatformManager
     from src.platforms.registry import PlatformRegistry
+    from src.platforms.youtube import YoutubeAdapter
 
     douyin = DouyinAdapter(
         DouyinSession(
@@ -145,7 +161,9 @@ def build_platform_manager(config):
             login_timeout=config.douyin.login_timeout,
         )
     )
-    return PlatformManager(PlatformRegistry([BilibiliAdapter(config), douyin]))
+    return PlatformManager(
+        PlatformRegistry([BilibiliAdapter(config), douyin, YoutubeAdapter()])
+    )
 
 
 async def _run_engine_with_live_async(engine, request, events):
@@ -274,30 +292,32 @@ def source_platforms():
 
 
 @source.command("status")
-@click.argument("platform", type=click.Choice(["bilibili", "douyin"]))
+@click.argument("platform", type=str)
 def source_status(platform):
     """检查平台登录状态。"""
     from src.config import load_config
 
-    adapter = build_platform_manager(load_config()).get(platform)
+    manager = build_platform_manager(load_config())
+    adapter = _require_platform(manager, platform)
     status = adapter.auth_status()
     console.print(f"{platform}: [cyan]{status.status}[/cyan] {status.message}")
 
 
 @source.command("login")
-@click.argument("platform", type=click.Choice(["bilibili", "douyin"]))
+@click.argument("platform", type=str)
 @click.option("--headful/--headless", default=True, help="使用外部可见浏览器扫码")
 def source_login(platform, headful):
     """打开平台扫码登录流程。"""
     from src.config import load_config
 
-    adapter = build_platform_manager(load_config()).get(platform)
+    manager = build_platform_manager(load_config())
+    adapter = _require_platform(manager, platform)
     adapter.authenticate(headful=headful)
 
 
 @source.command("creator")
 @click.argument("target")
-@click.option("--platform", type=click.Choice(["auto", "bilibili", "douyin"]), default="auto")
+@click.option("--platform", type=str, default="auto")
 @click.option("--emit", type=click.Choice(["episodes", "skill", "both"]), default=None)
 @click.option("--rag-chunks/--no-rag-chunks", default=None)
 @click.option("--download-workers", type=click.IntRange(min=1), default=None)
@@ -385,7 +405,6 @@ def crawl(uid, max_videos):
     from src.config import load_config
     from src.crawl.video_list import run_crawl, load_video_list
     from src.crawl.audio_download import (
-        batch_download,
         generate_cookies_file,
         check_audio_completeness,
         download_audio,
@@ -970,7 +989,7 @@ def distill(file_path, llm_provider, author_name, by_chapter, rag_chunks):
     output_path = _skill_output_path(config.output_dir, output_name)
     generator.generate_and_save(profile, output_path)
 
-    console.print(f"\n[bold green]文档蒸馏完成!")
+    console.print("\n[bold green]文档蒸馏完成!")
     console.print(f"[green]输出文件: {output_path}")
 
 

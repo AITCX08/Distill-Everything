@@ -11,12 +11,12 @@
 ## 全局约束
 
 - 以 [设计规格](../specs/2026-08-12-dashboard-unified-workbench-design.md) 为唯一视觉与范围依据；所有新增 Markdown 文档使用简体中文。
-- 只在唯一保留的项目目录 `C:\Users\Administrator\Desktop\Vibe\Distill-Everything` 中修改；不得访问或重建已删除的旧运行目录、旧主目录或额外工作树，也不得改动 Conda 环境。
+- 只在唯一保留的项目目录 `<workspace>\Distill-Everything` 中修改；不得访问或重建已删除的旧运行目录、旧主目录或额外工作树，也不得改动 Conda 环境。
 - 不改变 `#mission`、`#create`、`#platforms`、`#history`、`#artifacts`，不改变 API 路径、请求体、登录轮询、任务暂停/恢复/取消/重试和打开本地目录行为。
 - 保留 Fluent UI React v9 和现有 `@fluentui/react-icons`；不增加第二套 UI 框架、不使用伪造文件上传或无效按钮。
 - 新增可见文案全部中文；作品标题优先，BV 号/来源编号、保存位置与完成时间作为次级信息。禁止将真实 Cookie、二维码内容、令牌、真实用户目录或真实任务内容写入代码、测试或截图。
 - 无障碍：保留语义 `nav`、`main`、`aria-current`、表单标签、状态文本和 `:focus-visible`；支持窄屏导航与 `prefers-reduced-motion`。
-- Windows 不得直接执行 `pytest` 或 `python -m pytest`。本计划前端验证使用固定 `C:\Coding\node\node.exe`；Dashboard 健康检查只访问已运行的 `http://127.0.0.1:8765/api/v1/health`，不得打开可见 CMD、任务计划程序或浏览器。
+- Windows 不得直接执行 `pytest` 或 `python -m pytest`。本计划前端验证使用固定 `<node>\node.exe`；Dashboard 健康检查只访问已运行的 `http://127.0.0.1:8765/api/v1/health`，不得打开可见 CMD、任务计划程序或浏览器。
 - 每张任务卡结束前运行 `git diff --check`，只暂存本卡文件并使用计划指定的小提交信息。完成后更新本计划复选框；若中断，下一次从第一个未勾选任务卡继续。
 
 ---
@@ -54,7 +54,7 @@
 
 - [x] 1. 阅读规格、上述文件和 `dashboard/src/app/useWorkspace.ts`；确认工作树干净或仅含本计划允许的变更。
 - [x] 2. 先在 `PageHeader.test.tsx` 写红灯测试：渲染 `title="创建任务"`、`description="预检来源后创建任务"` 和按钮时，断言 `h1`、描述和按钮可见。
-- [x] 3. 使用 `C:\Coding\node\node.exe dashboard/node_modules/vitest/vitest.mjs run dashboard/src/components/PageHeader.test.tsx` 验证红灯，预期因模块不存在失败。
+- [x] 3. 使用 `<node>\node.exe dashboard/node_modules/vitest/vitest.mjs run dashboard/src/components/PageHeader.test.tsx` 验证红灯，预期因模块不存在失败。
 - [x] 4. 新建最小实现：
 
 ```tsx
@@ -168,8 +168,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
 - 修改：`docs/superpowers/plans/2026-08-12-dashboard-unified-workbench.md`
 
 - [x] 1. 检查所有新可见中文文案；搜索 `rg -n 'Distill-Anyone|TODO|TBD' dashboard/src`，修复本轮引入的不一致或占位文案。
-- [x] 2. 使用固定 Node 24 运行全部前端测试：`C:\Coding\node\node.exe dashboard/node_modules/vitest/vitest.mjs run`；记录通过数和退出码。
-- [x] 3. 使用固定 Node 24 运行 `C:\Coding\node\node.exe dashboard/node_modules/typescript/bin/tsc -b`，随后运行 `C:\Coding\node\node.exe dashboard/node_modules/vite/bin/vite.js build`。
+- [x] 2. 使用固定 Node 24 运行全部前端测试：`<node>\node.exe dashboard/node_modules/vitest/vitest.mjs run`；记录通过数和退出码。
+- [x] 3. 使用固定 Node 24 运行 `<node>\node.exe dashboard/node_modules/typescript/bin/tsc -b`，随后运行 `<node>\node.exe dashboard/node_modules/vite/bin/vite.js build`。
 - [x] 4. 运行 `C:\Coding\Anaconda\envs\Distill-Anyone\python.exe scripts/build_dashboard.py --from-dist` 和 `C:\Coding\Anaconda\envs\Distill-Anyone\python.exe scripts/build_dashboard.py --check`；不得执行 pytest。
 - [x] 5. 访问已运行的 `http://127.0.0.1:8765/api/v1/health`，确认返回 `status: ok` 与 `static_compatible: true`；若服务未运行，仅报告现状，不以可见 CMD 启动。
 - [x] 6. 使用浏览器手动核查 `#mission`、`#create`、`#platforms`、`#history`、`#artifacts` 的桌面和窄屏布局，重点确认键盘焦点、状态文字、二维码成功自动关闭和无水平溢出；不展示或截取真实二维码、Cookie、路径或任务数据。

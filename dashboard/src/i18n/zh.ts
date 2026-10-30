@@ -26,7 +26,7 @@ export function stageLabel(stage: string): string {
 export const jobStatusLabel = stageLabel;
 
 export function platformLabel(platform: string): string {
-  return ({ bilibili: "哔哩哔哩", douyin: "抖音", "imported-series": "外部系列任务", auto: "自动识别" } as Record<string, string>)[platform] ?? platform;
+  return ({ bilibili: "哔哩哔哩", douyin: "抖音", youtube: "YouTube", "imported-series": "外部系列任务", auto: "自动识别" } as Record<string, string>)[platform] ?? platform;
 }
 
 export function authStatusLabel(status: string): string {
