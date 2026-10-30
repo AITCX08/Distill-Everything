@@ -335,14 +335,14 @@ npm test
 npm run e2e
 ```
 
-Python 测试必须使用无窗口包装器在项目根目录运行：
+Python 测试在项目根目录直接运行 `python -m pytest` 即可。Windows 桌面端若遇到长命令流不稳定，可用项目自带的后台运行器：
 
 ```powershell
 $env:DISTILL_EVERYTHING_PYTHON = '<path-to-project-python.exe>'
 cmd /d /c start "" /b scripts\run-pytest-background.cmd tests\dashboard\test_output_directory.py
 ```
 
-随后读取 `.local-artifacts/test-runs/latest.exitcode` 与日志确认结果。不要直接执行 `pytest` 或 `python -m pytest`，以避免桌面端长命令流的已知稳定性问题。
+随后读取 `.local-artifacts/test-runs/latest.exitcode` 与日志确认结果。
 
 提交前至少执行与改动范围相符的测试，并检查 Markdown 与前端构建产物是否同步。完整开发规范、数据契约和架构细节请阅读：
 

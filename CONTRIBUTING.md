@@ -21,13 +21,15 @@ node node_modules/typescript/bin/tsc -b
 node node_modules/vite/bin/vite.js build
 ```
 
-在 Codex Desktop 的 Windows 环境中，Python 测试必须通过项目后台运行器启动，避免可见终端窗口和长命令流不稳定：
+在 Codex Desktop 的 Windows 环境中，如果遇到可见终端窗口或长命令流不稳定，可用项目自带的后台运行器（普通终端直接 `python -m pytest` 即可）：
 
 ```powershell
 $env:DISTILL_EVERYTHING_PYTHON = '<path-to-project-python.exe>'
 cmd /d /c start "" /b scripts\run-pytest-background.cmd tests\dashboard\test_series_control.py -q
 Get-Content .local-artifacts\test-runs\latest.exitcode
 ```
+
+> 历史提示：0.4.0 之前 Windows 上的“长命令流不稳定”实际来自 `os.kill(pid, 0)`——在 Windows 上它会向整个控制台进程组发送 CTRL+C。该问题已在 `src/application/process.py` 修复，现在 Python 测试可以直接运行。
 
 其他操作系统可使用其正常的项目 Python 测试命令；macOS 支持边界见[平台支持与故障排查](./docs/平台支持与故障排查.md)。
 
