@@ -167,6 +167,29 @@ def _expected_count(payload: Mapping[str, Any]) -> int | None:
     return None
 
 
+_POST_API_MARKERS = ("/aweme/v1/web/aweme/post/",)
+# 注意：这里**不包含** /aweme/post/。收藏/合集页面上也可能并发加载作者作品流，
+# 混进来会把无关视频算进收藏夹；宁可报错也不要静默混入。
+_COLLECTION_API_MARKERS = (
+    "/aweme/v1/web/aweme/listcollection/",
+    "/aweme/v1/web/aweme/favorite/",
+    "/aweme/v1/web/mix/aweme/",
+)
+
+
+def api_markers_for(url: str) -> tuple[str, ...]:
+    """Pick the Douyin JSON endpoints that can carry a page's item list.
+
+    创作者主页只信任 ``/aweme/post/``；合集与「我的收藏」页面由其它端点返回，
+    且抖音换版本时路径会变，所以这里按页面类型接受一组候选路径。
+    """
+
+    lowered = (url or "").lower()
+    if "/collection/" in lowered or "showtab=collect" in lowered:
+        return _COLLECTION_API_MARKERS
+    return _POST_API_MARKERS
+
+
 class DouyinBrowserRoute:
     """Use browser-generated `/aweme/post/` requests as the signed page transport."""
 
@@ -176,10 +199,13 @@ class DouyinBrowserRoute:
         *,
         response_timeout_ms: int = 20_000,
         scroll_wait_ms: int = 750,
+        api_markers: tuple[str, ...] | None = None,
     ) -> None:
         self.session = session
         self.response_timeout_ms = response_timeout_ms
         self.scroll_wait_ms = scroll_wait_ms
+        self._forced_markers = api_markers
+        self._api_markers = api_markers or _POST_API_MARKERS
         self._page_context = None
         self._page = None
         self._creator_id: str | None = None
@@ -187,7 +213,8 @@ class DouyinBrowserRoute:
 
     def _capture(self, response: Any) -> None:
         url = str(getattr(response, "url", ""))
-        if "/aweme/v1/web/aweme/post/" not in url.lower():
+        lowered = url.lower()
+        if not any(marker in lowered for marker in self._api_markers):
             return
         try:
             payload = response.json()
@@ -201,6 +228,7 @@ class DouyinBrowserRoute:
 
     def _open(self, creator: SourceCreator) -> None:
         self.close()
+        self._api_markers = self._forced_markers or api_markers_for(creator.canonical_url)
         self._page_context = self.session.open_page(
             headless=self.session.acquisition_headless,
             task="enumerate",
@@ -246,7 +274,8 @@ class DouyinBrowserRoute:
                 return payload
             self._trigger_next_page()
         raise PlatformEnumerationError(
-            f"Douyin did not return /aweme/post/ cursor {cursor}; login may have expired"
+            f"Douyin did not return any of {list(self._api_markers)} for cursor {cursor}; "
+            "login may have expired, or the page type changed"
         )
 
     def close(self) -> None:

@@ -13,6 +13,46 @@ from src.platforms.models import ResolvedTarget
 _URL_RE = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 _SEC_UID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _DIRECT_RE = re.compile(r"^douyin:(?P<sec_uid>[A-Za-z0-9_.-]+)$", re.IGNORECASE)
+_COLLECTION_DIRECT_RE = re.compile(r"^douyin:collection:(?P<collection_id>\d+)$", re.IGNORECASE)
+_COLLECT_TAB_RE = re.compile(r"showtab=collect", re.IGNORECASE)
+
+
+def extract_collection_target(value: str) -> tuple[str, str] | None:
+    """Return ``(creator_id, canonical_url)`` for a Douyin collection/favourites page.
+
+    Supported shapes:
+
+    - ``https://www.douyin.com/collection/<digits>``：合集/收藏夹页面；
+    - ``https://www.douyin.com/user/<sec_uid|self>?showTab=collect``：我的收藏；
+    - ``douyin:collection:<digits>``：显式写法（便于脚本与测试）。
+    """
+
+    text = value.strip()
+    direct = _COLLECTION_DIRECT_RE.fullmatch(text)
+    if direct:
+        collection_id = direct.group("collection_id")
+        return (
+            f"{collection_id}-collection",
+            f"https://www.douyin.com/collection/{collection_id}",
+        )
+
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return None
+    hostname = (parsed.hostname or "").lower()
+    if hostname != "douyin.com" and not hostname.endswith(".douyin.com"):
+        return None
+    parts = [unquote(part) for part in parsed.path.split("/") if part]
+    if len(parts) == 2 and parts[0] == "collection" and parts[1].isdigit():
+        return (
+            f"{parts[1]}-collection",
+            f"https://www.douyin.com/collection/{parts[1]}",
+        )
+    if len(parts) >= 2 and parts[0] == "user" and _COLLECT_TAB_RE.search(parsed.query or ""):
+        who = parts[1] if _SEC_UID_RE.fullmatch(parts[1]) else "self"
+        return f"{who}-collect", f"https://www.douyin.com/user/{who}?showTab=collect"
+    return None
 
 
 def extract_sec_uid(value: str) -> str | None:
@@ -59,6 +99,10 @@ class DouyinResolver:
         self.timeout_ms = timeout_ms
 
     def resolve_share_url(self, target: str) -> ResolvedTarget:
+        collection = self.resolve_collection(target)
+        if collection is not None:
+            return collection
+
         direct = _DIRECT_RE.fullmatch(target.strip())
         if direct:
             creator_id = direct.group("sec_uid")
@@ -98,6 +142,25 @@ class DouyinResolver:
                 "Unable to resolve sec_uid from the Douyin share link; login may have expired"
             )
         return self._result(creator_id, target)
+
+    def resolve_collection(self, target: str) -> ResolvedTarget | None:
+        """Resolve a collection/favourites target without touching the browser."""
+
+        resolved = extract_collection_target(target.strip())
+        if resolved is None:
+            target_url = extract_target_url(target)
+            if target_url:
+                resolved = extract_collection_target(target_url)
+        if resolved is None:
+            return None
+        creator_id, canonical_url = resolved
+        return ResolvedTarget(
+            platform="douyin",
+            creator_id=creator_id,
+            canonical_url=canonical_url,
+            original_target=target,
+            target_type="collection",
+        )
 
     @staticmethod
     def _result(creator_id: str, original_target: str) -> ResolvedTarget:

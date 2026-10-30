@@ -291,3 +291,31 @@ def test_runner_accepts_bilibili_sessdata_without_bili_jct(tmp_path):
 
     assert result.platform == "bilibili"
     assert result.total == 1
+
+
+def test_preview_allows_adapters_that_declare_no_authentication(tmp_path):
+    """YouTube-style adapters return ``not_required``; that is not a failure."""
+
+    class NoAuthAdapter(PreviewAdapter):
+        descriptor = SimpleNamespace(name="youtube")
+
+        def auth_status(self):
+            return AuthStatus("not_required", "YouTube 公开内容无需登录")
+
+        def resolve(self, target):
+            return ResolvedTarget("youtube", "handle", target, target)
+
+        def get_creator(self, target):
+            return SourceCreator("youtube", target.creator_id, "TED", target.canonical_url)
+
+    adapter = NoAuthAdapter()
+    runner = SourceDistillationRunner(
+        config=make_config(tmp_path),
+        platform_manager=SimpleNamespace(select=lambda target, platform: adapter),
+        events=EventHub(),
+    )
+
+    preview = runner.preview(PreviewRequest(target="https://www.youtube.com/@handle"))
+
+    assert preview.platform == "youtube"
+    assert preview.total_items == 2

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,10 +94,23 @@ class YoutubeAdapter:
                 timeout=900,
                 check=False,
             )
-        except FileNotFoundError as exc:
-            raise PlatformEnumerationError(
-                "yt-dlp is not installed; run `pip install -r requirements.txt`"
-            ) from exc
+        except FileNotFoundError:
+            # ``pip install yt-dlp`` may land outside PATH; fall back to the module.
+            command = [sys.executable, "-m", "yt_dlp", *args]
+            try:
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=900,
+                    check=False,
+                )
+            except FileNotFoundError as exc:
+                raise PlatformEnumerationError(
+                    "yt-dlp is not installed; run `pip install -r requirements.txt`"
+                ) from exc
         except subprocess.TimeoutExpired as exc:
             raise PlatformEnumerationError("yt-dlp timed out") from exc
         if completed.returncode != 0:

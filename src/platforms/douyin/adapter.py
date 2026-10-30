@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Mapping
 from urllib.parse import urlparse
 
-from src.platforms.douyin.resolver import DouyinResolver, extract_sec_uid, extract_target_url
+from src.platforms.douyin.resolver import (
+    DouyinResolver,
+    extract_collection_target,
+    extract_sec_uid,
+    extract_target_url,
+)
 from src.platforms.douyin.enumerator import DouyinBrowserRoute, DouyinEnumerator
 from src.platforms.douyin.downloader import DouyinDownloader
 from src.platforms.douyin.enumerator import map_aweme
@@ -30,7 +35,11 @@ _DIRECT_RE = re.compile(r"^douyin:[A-Za-z0-9_.-]+$", re.IGNORECASE)
 class DouyinAdapter:
     descriptor = PlatformDescriptor(
         name="douyin",
-        url_patterns=(r"https?://(?:v\.)?douyin\.com/",),
+        url_patterns=(
+            r"https?://(?:v\.)?douyin\.com/",
+            r"https?://(?:www\.)?douyin\.com/collection/\d+",
+            r"douyin:collection:\d+",
+        ),
         item_types=frozenset({ItemType.VIDEO, ItemType.GALLERY}),
         requires_browser=True,
         requires_auth=True,
@@ -55,9 +64,13 @@ class DouyinAdapter:
     def matches(self, target: str) -> bool:
         if _DIRECT_RE.fullmatch(target.strip()):
             return True
+        if extract_collection_target(target.strip()):
+            return True
         url = extract_target_url(target)
         if not url:
             return False
+        if extract_collection_target(url):
+            return True
         hostname = (urlparse(url).hostname or "").lower()
         return hostname == "douyin.com" or hostname.endswith(".douyin.com")
 
@@ -68,6 +81,10 @@ class DouyinAdapter:
         self.session.authenticate(headful=headful)
 
     def resolve(self, target: str) -> ResolvedTarget:
+        collection = self._resolver_factory(None).resolve_collection(target)
+        if collection is not None:
+            return collection
+
         direct = _DIRECT_RE.fullmatch(target.strip())
         url = extract_target_url(target)
         if direct or (url and extract_sec_uid(url)):
@@ -79,6 +96,19 @@ class DouyinAdapter:
             return self._resolver_factory(page).resolve_share_url(target)
 
     def get_creator(self, target: ResolvedTarget) -> SourceCreator:
+        if target.target_type == "collection":
+            label = (
+                "我的收藏"
+                if target.creator_id.endswith("-collect")
+                else f"抖音合集 {target.creator_id.split('-')[0]}"
+            )
+            return SourceCreator(
+                platform="douyin",
+                creator_id=target.creator_id,
+                display_name=label,
+                canonical_url=target.canonical_url,
+                raw_metadata={"target_type": "collection"},
+            )
         if self._creator_loader is not None:
             return self._creator_loader(target)
         profile: dict[str, Any] = {}

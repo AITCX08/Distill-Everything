@@ -189,7 +189,9 @@ class SourceDistillationRunner:
         if session is not None:
             session.acquisition_headless = not headful
         auth = adapter.auth_status()
-        if auth.status not in {"configured", "authenticated", "ready"}:
+        # ``not_required`` is an explicit adapter claim (e.g. YouTube public pages):
+        # it must not be treated as a missing credential.
+        if auth.status not in {"configured", "authenticated", "ready", "not_required"}:
             raise PlatformAuthenticationError(
                 auth.message
                 or f"{adapter.descriptor.name} authentication is required"

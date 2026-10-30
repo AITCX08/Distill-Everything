@@ -36,6 +36,7 @@ Distill-Everything 是一个本地优先的内容蒸馏工具。它可以从创�
 | Windows CLI、Dashboard 与本地工作流 | 正式支持 | Dashboard 仅监听 `127.0.0.1`。 |
 | macOS 安装、CLI、Dashboard 与基础 CI | 正式文档支持 | 使用前台 Dashboard 命令；详细限制见[平台支持与故障排查](./docs/平台支持与故障排查.md)。 |
 | Bilibili / 抖音扫码、Playwright 浏览器 | 需要设备验收 | 不承诺未经真实设备验证的平台登录稳定性。 |
+| 抖音收藏夹 / 合集（`/collection/<id>`、`user/<sec_uid>?showTab=collect`） | 实验性 | 需登录 + Playwright Chromium；接口路径随抖音版本变化，失败会明确报错而不是混入无关视频。 |
 | YouTube（`@handle`、`/channel/UC…`、单视频） | 实验性 | 走 `yt-dlp`，公开内容无需登录；不处理会员、付费或需登录的视频。 |
 | Apple Silicon FunASR MPS | 需要设备验收 | 不承诺与 CUDA 或 CPU 相同的性能和稳定性。 |
 
@@ -53,7 +54,7 @@ Distill-Everything 是一个本地优先的内容蒸馏工具。它可以从创�
 
 ## 核心能力
 
-- **多平台创作者蒸馏**：通过统一的 Source Adapter 接入 Bilibili、抖音与 YouTube；`--platform auto` 按链接自动选平台，新增平台只需实现并注册适配器。
+- **多平台创作者蒸馏**：通过统一的 Source Adapter 接入 Bilibili、抖音（含收藏夹/合集）与 YouTube；`--platform auto` 按链接自动选平台，新增平台只需实现并注册适配器。
 - **双输出形态**：每件作品生成独立 Markdown（episodes），也可聚合为一个 `SKILL.md`；两者可同时生成。
 - **可恢复流水线**：任务状态、产物哈希与阶段进度持久化；中断后从最近的有效阶段恢复，支持单项重试。
 - **真实进度与本地 Dashboard**：下载字节进度、阶段进度、ETA、实时 trace、暂停/恢复/取消和产物预览。

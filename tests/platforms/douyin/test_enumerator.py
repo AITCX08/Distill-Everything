@@ -144,3 +144,51 @@ def test_map_aweme_preserves_video_and_gallery_shapes():
     assert [asset.kind for asset in gallery.assets] == ["image", "image"]
     assert gallery.canonical_url.endswith("/note/2")
     assert gallery.raw_metadata["author"]["nickname"] == "Creator"
+
+
+def test_api_markers_switch_for_collection_pages():
+    from src.platforms.douyin.enumerator import api_markers_for
+
+    creator_markers = api_markers_for("https://www.douyin.com/user/SEC_UID")
+    collect_markers = api_markers_for("https://www.douyin.com/user/self?showTab=collect")
+    collection_markers = api_markers_for("https://www.douyin.com/collection/7123")
+
+    assert "/aweme/v1/web/aweme/post/" in creator_markers
+    assert collect_markers == collection_markers
+    assert any("listcollection" in marker for marker in collection_markers)
+    assert collect_markers != creator_markers
+
+
+def test_route_accepts_collection_payloads_and_keeps_the_cursor():
+    from src.platforms.douyin.enumerator import DouyinBrowserRoute, api_markers_for
+
+    class Response:
+        def __init__(self, url, payload):
+            self.url = url
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    route = DouyinBrowserRoute(None)
+    route._api_markers = api_markers_for("https://www.douyin.com/collection/7123")
+
+    route._capture(Response("https://www.douyin.com/aweme/v1/web/aweme/post/?max_cursor=0", {"aweme_list": []}))
+    route._capture(
+        Response(
+            "https://www.douyin.com/aweme/v1/web/aweme/listcollection/?max_cursor=42",
+            {"aweme_list": [{"aweme_id": "1"}], "has_more": 1},
+        )
+    )
+
+    assert [cursor for cursor, _ in route._responses] == ["42"]
+
+    route._api_markers = api_markers_for("https://www.douyin.com/user/SEC_UID")
+    before = len(route._responses)
+    route._capture(
+        Response(
+            "https://www.douyin.com/aweme/v1/web/aweme/listcollection/?max_cursor=42",
+            {"aweme_list": []},
+        )
+    )
+    assert len(route._responses) == before

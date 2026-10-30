@@ -172,7 +172,7 @@ class ResolvedTarget:
             raise ValueError("Resolved target creator ID cannot be empty")
         if not self.canonical_url:
             raise ValueError("Resolved target canonical URL cannot be empty")
-        if self.target_type not in {"creator", "video"}:
+        if self.target_type not in {"creator", "video", "collection"}:
             raise ValueError(f"Unsupported resolved target type: {self.target_type!r}")
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 

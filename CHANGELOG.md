@@ -2,6 +2,20 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，并遵循语义化版本号。
 
+## [Unreleased]
+
+### 新增
+
+- 抖音收藏夹 / 合集自动蒸馏：新增 `collection` target 类型，支持
+  `https://www.douyin.com/user/self?showTab=collect`、`https://www.douyin.com/collection/<id>`
+  与显式写法 `douyin:collection:<id>`；解析不启动浏览器，枚举只接受收藏类 JSON 端点。
+
+### 修复
+
+- CLI 不再把 `auth_status="not_required"` 当成认证失败：此前 YouTube 会在预检阶段直接报
+  “YouTube 公开内容无需登录”并退出。
+- YouTube 适配器在 `yt-dlp` 可执行文件不在 PATH 时回退到 `python -m yt_dlp`。
+
 ## [0.4.0] - 2026-08-13
 
 首个公开 Beta。核心变化是把「单机脚本流水线」升级为「多平台 + 受控 Worker + 本地 Dashboard」。
