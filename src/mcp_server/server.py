@@ -26,6 +26,18 @@ INSTRUCTIONS = """Distill-Everything 是一个本地优先的内容蒸馏工具�
 """
 
 
+def _register(server: Any, name: str):
+    """Register a tool by name, tolerating SDK builds without ``name=``."""
+
+    def decorate(function: Any) -> Any:
+        try:
+            return server.tool(name=name)(function)
+        except TypeError:  # older SDK: only the bare decorator exists
+            return server.tool()(function)
+
+    return decorate
+
+
 class _StdoutShim:
     """Send application text output to stderr, keep stdout for the protocol.
 
@@ -67,26 +79,21 @@ def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> 
     except TypeError:  # older SDK builds without host/port kwargs
         server = FastMCP("distill-everything", instructions=INSTRUCTIONS)
 
-    @server.tool(
-        name="distill_list_platforms",
-        description="列出可用的内容平台（bilibili / douyin / youtube）、支持的作品类型与登录状态。",
-    )
+    @_register(server, "distill_list_platforms")
     def distill_list_platforms() -> list[dict[str, Any]]:
+        """列出可用的内容平台（bilibili / douyin / youtube）、支持的作品类型与登录状态。"""
+
         return tools.list_platforms(service)
 
-    @server.tool(
-        name="distill_preview",
-        description=(
-            "预检一个创作者主页、抖音收藏夹/合集或单视频链接：只解析并枚举，"
-            "不下载、不调用 ASR/LLM、不写任务状态。返回 fingerprint，供 distill_create_job 使用。"
-        ),
-    )
+    @_register(server, "distill_preview")
     def distill_preview(
         target: str,
         platform: str = "auto",
         outputs: list[str] | None = None,
         rag_chunks: bool = False,
     ) -> dict[str, Any]:
+        """预检创作者主页、抖音收藏夹/合集或单视频链接：只解析并枚举，不下载、不写状态，返回 fingerprint。"""
+
         return tools.preview_target(
             service,
             target,
@@ -95,13 +102,7 @@ def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> 
             rag_chunks=rag_chunks,
         )
 
-    @server.tool(
-        name="distill_create_job",
-        description=(
-            "用 distill_preview 返回的 preview_fingerprint 创建并启动蒸馏任务。"
-            "outputs 可选 episodes / skill；rag_chunks=true 时额外产出 RAG 分块。"
-        ),
-    )
+    @_register(server, "distill_create_job")
     def distill_create_job(
         target: str,
         preview_fingerprint: str,
@@ -110,6 +111,8 @@ def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> 
         rag_chunks: bool = False,
         output_directory: str = "",
     ) -> dict[str, Any]:
+        """用 distill_preview 返回的 preview_fingerprint 创建并启动蒸馏任务；outputs 可选 episodes / skill。"""
+
         return tools.create_job(
             service,
             target,
@@ -120,44 +123,39 @@ def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> 
             output_directory=output_directory,
         )
 
-    @server.tool(
-        name="distill_list_jobs",
-        description="列出本机所有蒸馏任务（按更新时间倒序）：状态、进度计数、创作者与平台。",
-    )
+    @_register(server, "distill_list_jobs")
     def distill_list_jobs() -> list[dict[str, Any]]:
+        """列出本机所有蒸馏任务（按更新时间倒序）：状态、进度计数、创作者与平台。"""
+
         return tools.list_jobs(service)
 
-    @server.tool(
-        name="distill_get_job",
-        description="读取单个任务的总览：状态、revision、已完成/失败/不支持数量。",
-    )
+    @_register(server, "distill_get_job")
     def distill_get_job(job_id: str) -> dict[str, Any]:
+        """读取单个任务的总览：状态、revision、已完成/失败/不支持数量。"""
+
         return tools.get_job(service, job_id)
 
-    @server.tool(
-        name="distill_list_job_items",
-        description="列出任务内每个作品的处理状态、阶段进度与失败原因。",
-    )
+    @_register(server, "distill_list_job_items")
     def distill_list_job_items(job_id: str) -> list[dict[str, Any]]:
+        """列出任务内每个作品的处理状态、阶段进度与失败原因。"""
+
         return tools.list_job_items(service, job_id)
 
-    @server.tool(
-        name="distill_list_artifacts",
-        description="列出任务已产出的文件（transcript / cleaned / knowledge），只给文件名、大小与哈希。",
-    )
+    @_register(server, "distill_list_artifacts")
     def distill_list_artifacts(job_id: str) -> list[dict[str, Any]]:
+        """列出任务已产出的文件（transcript / cleaned / knowledge），只给文件名、大小与哈希。"""
+
         return tools.list_artifacts(service, job_id)
 
-    @server.tool(
-        name="distill_read_artifact",
-        description="读取一个产物的文本内容（Markdown/JSON）；超长内容会被显式截断并标记 truncated。",
-    )
+    @_register(server, "distill_read_artifact")
     def distill_read_artifact(
         job_id: str,
         source_id: str,
         kind: str,
         max_chars: int = tools.MAX_ARTIFACT_CHARS,
     ) -> dict[str, Any]:
+        """读取一个产物的文本内容（Markdown/JSON）；超长内容会被显式截断并标记 truncated。"""
+
         return tools.read_artifact(
             service,
             job_id,
@@ -166,15 +164,14 @@ def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> 
             max_chars=max_chars,
         )
 
-    @server.tool(
-        name="distill_control_job",
-        description="控制任务：pause / resume / retry_failed。默认使用任务当前 revision。",
-    )
+    @_register(server, "distill_control_job")
     def distill_control_job(
         job_id: str,
         action: str,
         expected_revision: int | None = None,
     ) -> dict[str, Any]:
+        """控制任务：pause / resume / retry_failed。默认使用任务当前 revision。"""
+
         return tools.control_job(
             service,
             job_id,
