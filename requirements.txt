@@ -1,5 +1,5 @@
 bilibili-api-python>=16.0.0
-yt-dlp>=2024.0.0
+yt-dlp>=2026.10.26
 funasr>=1.0.0
 anthropic>=0.30.0
 openai>=1.0.0
