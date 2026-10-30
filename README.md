@@ -35,7 +35,7 @@ Distill-Everything 是一个本地优先的内容蒸馏工具。它可以从创�
 | --- | --- | --- |
 | Windows CLI、Dashboard 与本地工作流 | 正式支持 | Dashboard 仅监听 `127.0.0.1`。 |
 | macOS 安装、CLI、Dashboard 与基础 CI | 正式文档支持 | 使用前台 Dashboard 命令；详细限制见[平台支持与故障排查](./docs/平台支持与故障排查.md)。 |
-| Bilibili / 抖音扫码、Playwright 浏览器 | 需要设备验收 | 不承诺未经真实设备验证的平台登录稳定性。 |
+| Bilibili / 抖音扫码、Playwright 浏览器 | 需要设备验收 | 登录二维码在 Dashboard 页内弹窗展示；抖音需要 `playwright install chromium`，失败时提示改用 CLI。 |
 | 抖音收藏夹 / 合集（`/collection/<id>`、`user/<sec_uid>?showTab=collect`） | 实验性 | 需登录 + Playwright Chromium；接口路径随抖音版本变化，失败会明确报错而不是混入无关视频。 |
 | YouTube（`@handle`、`/channel/UC…`、单视频） | 实验性 | 走 `yt-dlp`，公开内容无需登录；不处理会员、付费或需登录的视频。 |
 | Apple Silicon FunASR MPS | 需要设备验收 | 不承诺与 CUDA 或 CPU 相同的性能和稳定性。 |
@@ -254,7 +254,7 @@ python main.py dashboard --port 9000
 Dashboard 提供：
 
 - 无活动任务时仍保留完整工作台：0% 总览、空任务队列、创建任务快捷入口和本地隐私说明。
-- 平台状态与本地扫码登录；页面不会保存 Cookie 或二维码载荷。
+- 平台状态与本地扫码登录：所有平台都在页面内弹窗展示二维码，页面不会保存 Cookie 或二维码载荷。
 - 来源预检、输出模板预览、默认保存位置和单次覆盖保存位置。
 - 可读的作品标题、实时下载/阶段进度、ETA 与脱敏 trace。
 - 暂停、恢复、取消和失败单项重试。

@@ -9,6 +9,13 @@
 - 抖音收藏夹 / 合集自动蒸馏：新增 `collection` target 类型，支持
   `https://www.douyin.com/user/self?showTab=collect`、`https://www.douyin.com/collection/<id>`
   与显式写法 `douyin:collection:<id>`；解析不启动浏览器，枚举只接受收藏类 JSON 端点。
+- 抖音 **Dashboard 页内扫码登录**：`DouyinLoginCoordinator` 用无头持久上下文截取登录二维码，
+  经本地接口提供给弹窗；拿不到二维码时回退提示 CLI 的外部浏览器流程。
+
+### 变更
+
+- 登录接口统一为 `/api/v1/platforms/<platform>/login[/<op>[/qr]]`，Bilibili 与抖音共用同一套前端弹窗。
+- 抖音认证提示改为中文页内引导，不再提示“在外部浏览器登录”。
 
 ### 修复
 

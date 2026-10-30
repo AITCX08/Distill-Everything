@@ -26,14 +26,15 @@ type Platform = {
   auth_message: string;
 };
 
-type BilibiliLogin = {
+type QrLogin = {
   operation_id: string;
+  platform: string;
   status: string;
   message: string;
   qr_url: string;
 };
 
-type BilibiliLoginStatus = Pick<BilibiliLogin, "operation_id" | "status" | "message">;
+type QrLoginStatus = Pick<QrLogin, "operation_id" | "status" | "message">;
 
 function isPlatform(value: unknown): value is Platform {
   return typeof value === "object" && value !== null
@@ -45,15 +46,16 @@ function isPlatform(value: unknown): value is Platform {
     && "auth_message" in value && typeof value.auth_message === "string";
 }
 
-function isBilibiliLogin(value: unknown): value is BilibiliLogin {
+function isQrLogin(value: unknown): value is QrLogin {
   return typeof value === "object" && value !== null
     && "operation_id" in value && typeof value.operation_id === "string"
+    && "platform" in value && typeof value.platform === "string"
     && "status" in value && typeof value.status === "string"
     && "message" in value && typeof value.message === "string"
     && "qr_url" in value && typeof value.qr_url === "string";
 }
 
-function isBilibiliLoginStatus(value: unknown): value is BilibiliLoginStatus {
+function isQrLoginStatus(value: unknown): value is QrLoginStatus {
   return typeof value === "object" && value !== null
     && "operation_id" in value && typeof value.operation_id === "string"
     && "status" in value && typeof value.status === "string"
@@ -67,9 +69,6 @@ function isActiveLogin(status: string): boolean {
 function displayAuthMessage(platform: Platform): string {
   if (platform.name === "bilibili" && platform.auth_message === "Run the Bilibili login command") {
     return "在本页面弹出二维码，扫码并在手机上确认后会自动更新登录状态。";
-  }
-  if (platform.name === "douyin" && platform.auth_message === "Run the Douyin login command in an external browser") {
-    return "抖音需要在外部持久浏览器中完成扫码登录。";
   }
   return authMessageLabel(platform.auth_message);
 }
@@ -87,7 +86,7 @@ export function PlatformsPage() {
   const [loading, setLoading] = useState(false);
   const [loginPending, setLoginPending] = useState<string | null>(null);
   const [openingPlatform, setOpeningPlatform] = useState<string | null>(null);
-  const [bilibiliLogin, setBilibiliLogin] = useState<BilibiliLogin | null>(null);
+  const [qrLogin, setQrLogin] = useState<QrLogin | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
@@ -108,24 +107,26 @@ export function PlatformsPage() {
   useEffect(() => { void refresh(); }, []);
 
   useEffect(() => {
-    if (!bilibiliLogin || !isActiveLogin(bilibiliLogin.status)) return undefined;
+    if (!qrLogin || !isActiveLogin(qrLogin.status)) return undefined;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
       try {
-        const response = await getJson<unknown>(`/api/v1/platforms/bilibili/login/${bilibiliLogin.operation_id}`);
-        if (stopped || !isBilibiliLoginStatus(response)) return;
-        setBilibiliLogin((current) => current && current.operation_id === response.operation_id
+        const response = await getJson<unknown>(
+          `/api/v1/platforms/${encodeURIComponent(qrLogin.platform)}/login/${qrLogin.operation_id}`,
+        );
+        if (stopped || !isQrLoginStatus(response)) return;
+        setQrLogin((current) => current && current.operation_id === response.operation_id
           ? { ...current, status: response.status, message: response.message }
           : current);
         if (response.status === "succeeded") {
-          setBilibiliLogin(null);
+          setQrLogin(null);
           void refresh();
           return;
         }
         if (isActiveLogin(response.status)) timer = setTimeout(() => void poll(), 1000);
       } catch {
-        if (!stopped) setBilibiliLogin((current) => current ? {
+        if (!stopped) setQrLogin((current) => current ? {
           ...current,
           status: "failed",
           message: "无法读取登录状态，请关闭后重新发起登录。",
@@ -137,7 +138,7 @@ export function PlatformsPage() {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [bilibiliLogin?.operation_id, bilibiliLogin?.status]);
+  }, [qrLogin?.platform, qrLogin?.operation_id, qrLogin?.status]);
 
   async function openLogin(platform: Platform) {
     setLoginPending(platform.name);
@@ -145,15 +146,15 @@ export function PlatformsPage() {
     setError(null);
     try {
       const response = await postJson<unknown>(`/api/v1/platforms/${encodeURIComponent(platform.name)}/login`, {});
-      if (platform.name === "bilibili") {
-        if (!isBilibiliLogin(response)) throw new Error("invalid Bilibili login response");
-        setBilibiliLogin(response);
-      } else {
-        if (typeof response !== "object" || response === null || !("status" in response) || response.status !== "opening_browser") {
-          throw new Error("invalid login response");
-        }
-        setOpeningPlatform(platform.name);
+      if (isQrLogin(response)) {
+        setQrLogin(response);
+        return;
       }
+      if (typeof response === "object" && response !== null && "status" in response && response.status === "opening_browser") {
+        setOpeningPlatform(platform.name);
+        return;
+      }
+      throw new Error("invalid login response");
     } catch (reason) {
       setError(reason instanceof DashboardRequestError && reason.code === "offline"
         ? "本地引擎离线，未能启动登录。"
@@ -197,19 +198,23 @@ export function PlatformsPage() {
         </div>
       </Card>
 
-      <Dialog open={bilibiliLogin !== null} onOpenChange={(_, data) => { if (!data.open) setBilibiliLogin(null); }}>
-        <DialogSurface aria-label="扫描二维码登录哔哩哔哩">
+      <Dialog open={qrLogin !== null} onOpenChange={(_, data) => { if (!data.open) setQrLogin(null); }}>
+        <DialogSurface aria-label={`扫描二维码登录${qrLogin ? platformLabel(qrLogin.platform) : ""}`}>
           <DialogBody>
-            <DialogTitle>扫描二维码登录哔哩哔哩</DialogTitle>
+            <DialogTitle>扫描二维码登录{qrLogin ? platformLabel(qrLogin.platform) : ""}</DialogTitle>
             <DialogContent>
-              {bilibiliLogin?.status === "preparing_qr" ? <Spinner label="正在生成二维码…" /> : (
-                <img className="bilibili-qr" src={bilibiliLogin?.qr_url} alt="哔哩哔哩登录二维码" />
+              {qrLogin && isActiveLogin(qrLogin.status) && (
+                qrLogin.status === "preparing_qr"
+                  ? <Spinner label="正在生成二维码…" />
+                  : <img className="bilibili-qr" src={qrLogin.qr_url} alt={`${platformLabel(qrLogin.platform)}登录二维码`} />
               )}
-              <Text role="status">{bilibiliLogin?.message}</Text>
-              <Text size={200}>请使用手机 App 扫码，并在手机上确认；成功后本页会自动更新为已登录。</Text>
+              <Text role="status">{qrLogin?.message}</Text>
+              {qrLogin && isActiveLogin(qrLogin.status) && (
+                <Text size={200}>请使用手机 App 扫码，并在手机上确认；成功后本页会自动更新为已登录。</Text>
+              )}
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => setBilibiliLogin(null)}>关闭</Button>
+              <Button appearance="secondary" onClick={() => setQrLogin(null)}>关闭</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>

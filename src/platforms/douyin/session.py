@@ -142,11 +142,18 @@ class DouyinSession:
         with self.open_context(headless=headless, task=task) as context:
             yield _first_page(context)
 
+    # -- probes reused by the Dashboard QR coordinator --------------------
+    def first_page(self, context: Any) -> Any:
+        return _first_page(context)
+
+    def is_authenticated(self, context: Any, page: Any) -> bool:
+        return _context_authenticated(context, page)
+
     def auth_status(self) -> AuthStatus:
         if not self._has_profile():
-            return AuthStatus("missing", "Run the Douyin login command in an external browser")
+            return AuthStatus("missing", "在「平台与登录」页内扫码登录抖音")
         if self.stale_flag.exists():
-            return AuthStatus("expired", "Douyin login expired; scan the QR code again")
+            return AuthStatus("expired", "抖音登录已过期，请重新扫码登录")
         try:
             with self.open_context(headless=True, task="auth-probe") as context:
                 page = _first_page(context)
@@ -156,7 +163,7 @@ class DouyinSession:
             return AuthStatus("unavailable", str(exc))
         if not authenticated:
             self.mark_stale()
-            return AuthStatus("expired", "Douyin login expired; scan the QR code again")
+            return AuthStatus("expired", "抖音登录已过期，请重新扫码登录")
         self.mark_authenticated()
         return AuthStatus("authenticated", "Douyin browser session is ready")
 

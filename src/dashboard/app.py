@@ -76,6 +76,7 @@ def create_dashboard_app(
     app.state.local_session = new_local_session()
     app.state.reveal_directory = reveal_directory
     app.state.bilibili_login = BilibiliLoginCoordinator()
+    app.state.qr_logins = {}
     app.state.series_controller = None
     app.state.task_manager = None
     runner_config = getattr(getattr(service, "source_runner", None), "config", None)

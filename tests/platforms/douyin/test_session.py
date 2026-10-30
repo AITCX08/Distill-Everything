@@ -32,7 +32,7 @@ def test_missing_profile_is_actionable_without_launching_browser(tmp_path):
     status = session.auth_status()
 
     assert status.status == "missing"
-    assert "login" in status.message.lower()
+    assert "扫码登录" in status.message
     assert calls == []
     assert session.profile_dir == tmp_path / "browser" / "douyin"
 

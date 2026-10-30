@@ -114,3 +114,48 @@ def test_bilibili_login_exposes_a_local_qr_session_without_opening_a_browser(tmp
     assert state.json()["status"] == "waiting_for_confirmation"
     assert qr.headers["content-type"] == "image/png"
     assert qr.content == b"png-bytes"
+
+
+class FakeDouyinLogin:
+    def start(self):
+        return BilibiliLoginSnapshot("dy-op", "waiting_for_scan", "请使用抖音 App 扫码")
+
+    def get(self, operation_id):
+        assert operation_id == "dy-op"
+        return BilibiliLoginSnapshot(operation_id, "succeeded", "登录成功")
+
+    def qr_png(self, operation_id):
+        assert operation_id == "dy-op"
+        return b"douyin-png"
+
+
+def test_douyin_login_serves_the_qr_inside_the_page(tmp_path):
+    """抖音也走页内弹窗：不再返回 opening_browser，二维码由本机接口提供。"""
+
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("dashboard", encoding="utf-8")
+    service = DistillationService(
+        repository=JobRepository(tmp_path / "jobs"), platform_manager=FakePlatforms()
+    )
+    app = create_dashboard_app(service, static_dir, "test")
+    app.state.qr_logins = {"douyin": FakeDouyinLogin()}
+    client = TestClient(app)
+    client.get("/api/v1/health")
+    headers = {"Origin": "http://testserver", "X-Distill-CSRF": client.cookies["distill_csrf"]}
+
+    started = client.post("/api/v1/platforms/douyin/login", headers=headers)
+    state = client.get("/api/v1/platforms/douyin/login/dy-op")
+    qr = client.get("/api/v1/platforms/douyin/login/dy-op/qr")
+
+    assert started.status_code == 200
+    assert started.json() == {
+        "operation_id": "dy-op",
+        "platform": "douyin",
+        "status": "waiting_for_scan",
+        "message": "请使用抖音 App 扫码",
+        "qr_url": "/api/v1/platforms/douyin/login/dy-op/qr",
+    }
+    assert state.json()["status"] == "succeeded"
+    assert qr.headers["content-type"] == "image/png"
+    assert qr.content == b"douyin-png"
