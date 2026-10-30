@@ -1,3 +1,4 @@
 # MCP 支持（可选依赖）：`pip install -r requirements-mcp.txt`
 # 仅在使用 `python main.py mcp` 时需要；其余功能不依赖它。
-mcp>=1.2
+# 目前适配 1.x（FastMCP）；2.x 把 FastMCP 改名为 MCPServer，尚未适配。
+mcp>=1.2,<2

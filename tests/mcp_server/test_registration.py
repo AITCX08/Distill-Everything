@@ -8,6 +8,7 @@ import io
 import pytest
 
 pytest.importorskip("mcp")
+pytest.importorskip("mcp.server.fastmcp", reason="MCP 2.x renamed FastMCP to MCPServer; this project supports 1.x")
 
 from src.mcp_server.server import _StdoutShim, build_server
 from tests.mcp_server.test_tools import FakeService

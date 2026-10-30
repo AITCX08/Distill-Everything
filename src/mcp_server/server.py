@@ -67,7 +67,13 @@ class _StdoutShim:
 def build_server(service: Any, *, host: str = "127.0.0.1", port: int = 8877) -> Any:
     """Build the FastMCP server; the SDK is imported lazily so the core stays light."""
 
-    from mcp.server.fastmcp import FastMCP
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ModuleNotFoundError as error:
+        raise RuntimeError(
+            "当前安装的是 MCP SDK 2.x（FastMCP 已改名 MCPServer），本项目适配 1.x；"
+            "请执行 `pip install \"mcp<2\"` 后重试。"
+        ) from error
 
     try:
         server = FastMCP(

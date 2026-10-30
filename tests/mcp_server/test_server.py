@@ -14,6 +14,7 @@ from src.mcp_server.server import build_server
 from tests.mcp_server.test_tools import FakeService
 
 pytest.importorskip("mcp")
+pytest.importorskip("mcp.server.fastmcp", reason="MCP 2.x renamed FastMCP to MCPServer")
 memory = pytest.importorskip("mcp.shared.memory")
 
 connect = getattr(memory, "create_connected_server_and_client_session", None)
