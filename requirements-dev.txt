@@ -1,5 +1,5 @@
 # 开发与验证依赖（运行期依赖见 requirements.txt）
-pytest>=8.0
+pytest>=9.1.1
 pytest-cov>=5.0
 pytest-timeout>=2.3
 ruff>=0.6
