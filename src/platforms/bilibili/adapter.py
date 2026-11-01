@@ -23,6 +23,7 @@ from src.crawl.audio_download import (
 from src.crawl.auth import get_credential, run_qrcode_login, save_credential
 from src.crawl.video_list import fetch_user_videos
 from src.distillation.progress import TransferProgress
+from src.platforms.bilibili.favorites import BilibiliFavorites
 from src.platforms.errors import PlatformDownloadError, TargetResolutionError
 from src.platforms.models import (
     AuthStatus,
@@ -53,6 +54,11 @@ _VIDEO_PATH_RE = re.compile(
     r"^/video/(?P<identifier>BV[0-9A-Za-z]+|av\d+)(?:/)?$",
     re.IGNORECASE,
 )
+_FAV_URL_RE = re.compile(
+    r"^https?://space\.bilibili\.com/(?P<mid>\d+)/favlist\?(?:[^#]*&)?fid=(?P<fid>\d+)",
+    re.IGNORECASE,
+)
+_FAV_DIRECT_RE = re.compile(r"^bilibili:fav:(?P<fid>\d+)$", re.IGNORECASE)
 _BILIBILI_VIEW_API = "https://api.bilibili.com/x/web-interface/view"
 _HTTP_TIMEOUT_SECONDS = 10
 _MAX_REDIRECTS = 4
@@ -62,6 +68,18 @@ def legacy_source_id(value: str) -> str:
     """Qualify a legacy BVID without double-prefixing new identifiers."""
 
     return value if value.startswith("bilibili_") else f"bilibili_{value}"
+
+
+def _favorite_target(target: str) -> tuple[str, str] | None:
+    """Return ``(fid, mid)`` for a favorite-folder target, ``mid`` may be empty."""
+
+    direct = _FAV_DIRECT_RE.match(target)
+    if direct:
+        return direct.group("fid"), ""
+    url = _FAV_URL_RE.match(target)
+    if url:
+        return url.group("fid"), url.group("mid")
+    return None
 
 
 class BilibiliAdapter:
@@ -92,6 +110,7 @@ class BilibiliAdapter:
         login_fn: Callable = run_qrcode_login,
         credential_saver: Callable = save_credential,
         http_request: Callable[..., Any] | None = None,
+        favorites: BilibiliFavorites | None = None,
     ):
         self._config = config
         self._credential_provider = credential_provider
@@ -101,12 +120,17 @@ class BilibiliAdapter:
         self._login_fn = login_fn
         self._credential_saver = credential_saver
         self._http_request = http_request or requests.request
+        sessdata = getattr(getattr(config, "bilibili", None), "sessdata", "") or ""
+        self._favorites = favorites or BilibiliFavorites(sessdata=sessdata)
 
     def matches(self, target: str) -> bool:
+        text = target.strip()
         return bool(
-            _SPACE_URL_RE.match(target.strip())
-            or _EXPLICIT_UID_RE.match(target.strip())
-            or _is_video_target(target)
+            _SPACE_URL_RE.match(text)
+            or _EXPLICIT_UID_RE.match(text)
+            or _FAV_URL_RE.match(text)
+            or _FAV_DIRECT_RE.match(text)
+            or _is_video_target(text)
         )
 
     def auth_status(self) -> AuthStatus:
@@ -136,6 +160,22 @@ class BilibiliAdapter:
 
     def resolve(self, target: str) -> ResolvedTarget:
         target = target.strip()
+        favorite = _favorite_target(target)
+        if favorite is not None:
+            fid, mid = favorite
+            return ResolvedTarget(
+                platform="bilibili",
+                creator_id=f"fav-{fid}",
+                canonical_url=(
+                    f"https://space.bilibili.com/{mid}/favlist?fid={fid}"
+                    if mid
+                    else f"https://space.bilibili.com/0/favlist?fid={fid}"
+                ),
+                original_target=target,
+                target_type="collection",
+                metadata={"fid": fid},
+            )
+
         match = _SPACE_URL_RE.match(target) or _EXPLICIT_UID_RE.match(target)
         if match:
             creator_id = match.group("uid")
@@ -163,6 +203,15 @@ class BilibiliAdapter:
             )
 
     def get_creator(self, target: ResolvedTarget) -> SourceCreator:
+        if target.target_type == "collection":
+            fid = str(target.metadata.get("fid") or target.creator_id.removeprefix("fav-"))
+            return SourceCreator(
+                platform="bilibili",
+                creator_id=target.creator_id,
+                display_name=f"B站收藏夹 {fid}",
+                canonical_url=target.canonical_url,
+                raw_metadata={"target_type": "collection", "fid": fid},
+            )
         if target.target_type == "video":
             return SourceCreator(
                 platform="bilibili",
@@ -184,6 +233,10 @@ class BilibiliAdapter:
         *,
         checkpoint: EnumerationCheckpoint | None,
     ) -> Iterator[EnumerationPage]:
+        fid = str(creator.raw_metadata.get("fid") or "") if creator.raw_metadata else ""
+        if fid:
+            yield from self._iter_favorite_pages(creator, fid, checkpoint)
+            return
         if _is_video_url(creator.canonical_url):
             item = self.map_video(creator.raw_metadata, creator.creator_id)
             yield EnumerationPage(
@@ -217,6 +270,59 @@ class BilibiliAdapter:
             expected_count=len(next_seen),
         )
         yield EnumerationPage(items=items, checkpoint=next_checkpoint, has_more=False)
+
+    def map_favorite_media(
+        self,
+        media: Mapping[str, Any],
+        creator_id: str,
+    ) -> SourceItem:
+        """Map one favorite-folder entry onto the shared item contract."""
+
+        bvid = str(media.get("bvid") or "").strip()
+        timestamp = media.get("pubtime")
+        published_at = None
+        if isinstance(timestamp, (int, float)) and timestamp > 0:
+            published_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        duration = media.get("duration")
+        return SourceItem(
+            platform="bilibili",
+            item_id=bvid,
+            creator_id=creator_id,
+            item_type=ItemType.VIDEO,
+            title=str(media.get("title") or bvid),
+            description=str(media.get("intro") or ""),
+            canonical_url=f"https://www.bilibili.com/video/{bvid}",
+            published_at=published_at,
+            duration_seconds=float(duration) if isinstance(duration, (int, float)) else None,
+            cover_url=str(media.get("cover") or "") or None,
+            raw_metadata={"target_type": "collection", "fav_title": media.get("title")},
+        )
+
+    def _iter_favorite_pages(
+        self,
+        creator: SourceCreator,
+        fid: str,
+        checkpoint: EnumerationCheckpoint | None,
+    ) -> Iterator[EnumerationPage]:
+        seen = set(checkpoint.seen_ids) if checkpoint else set()
+        folder = self._favorites.folder_info(fid)
+        for medias, has_more in self._favorites.iter_pages(fid):
+            items: list[SourceItem] = []
+            for media in medias:
+                item = self.map_favorite_media(media, creator.creator_id)
+                if not item.item_id or item.item_id in seen:
+                    continue
+                seen.add(item.item_id)
+                items.append(item)
+            yield EnumerationPage(
+                items=tuple(items),
+                checkpoint=EnumerationCheckpoint(
+                    seen_ids=frozenset(seen),
+                    complete=not has_more,
+                    expected_count=folder.media_count or None,
+                ),
+                has_more=has_more,
+            )
 
     def refresh_item(self, item: SourceItem) -> SourceItem:
         return item

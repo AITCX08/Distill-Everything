@@ -54,12 +54,51 @@ class DouyinAdapter:
         enumerator=None,
         downloader=None,
         creator_loader: Callable[[ResolvedTarget], SourceCreator] | None = None,
+        sidecar=None,
+        sidecar_required: bool = False,
     ) -> None:
         self.session = session
         self._resolver_factory = resolver_factory
         self._enumerator = enumerator or DouyinEnumerator(DouyinBrowserRoute(session))
         self._downloader = downloader or DouyinDownloader(refresh_item=self._refresh_from_browser)
         self._creator_loader = creator_loader
+        self._sidecar = sidecar
+        self._sidecar_required = bool(sidecar_required)
+        self._sidecar_checked = False
+        self._sidecar_ok = False
+
+    def _sidecar_ready(self) -> bool:
+        if self._sidecar is None:
+            return False
+        if not self._sidecar_checked:
+            self._sidecar_ok = self._sidecar.is_available()
+            self._sidecar_checked = True
+        return self._sidecar_ok or self._sidecar_required
+
+    def _sidecar_requester(self, creator: SourceCreator):
+        """Choose the sidecar endpoint for this target, or ``None`` to fall back."""
+
+        url = (creator.canonical_url or "").lower()
+        if "/collection/" in url:
+            mix_id = url.split("/collection/")[1].split("?")[0].strip("/")
+            if not mix_id.isdigit():
+                return None
+            return lambda _creator, cursor: self._sidecar.user_mix(
+                mix_id, cursor=int(cursor or 0)
+            )
+        if "showtab=collect" in url:
+            sec_uid = str(creator.creator_id).removesuffix("-collect")
+            if not sec_uid or sec_uid == "self":
+                return None  # 「我的收藏」只有浏览器里的登录态知道是谁
+            return lambda _creator, cursor: self._sidecar.user_collection(
+                sec_uid, cursor=int(cursor or 0)
+            )
+        sec_uid = str(creator.creator_id)
+        if not sec_uid or sec_uid.endswith("-collection"):
+            return None
+        return lambda _creator, cursor: self._sidecar.user_posts(
+            sec_uid, cursor=int(cursor or 0)
+        )
 
     def matches(self, target: str) -> bool:
         if _DIRECT_RE.fullmatch(target.strip()):
@@ -147,6 +186,11 @@ class DouyinAdapter:
         *,
         checkpoint: EnumerationCheckpoint | None,
     ) -> Iterator[EnumerationPage]:
+        if self._sidecar_ready():
+            requester = self._sidecar_requester(creator)
+            if requester is not None:
+                yield from DouyinEnumerator(requester).iter_pages(creator, checkpoint)
+                return
         if self._enumerator is None:
             raise RuntimeError("Douyin item enumerator is not configured")
         iterator = getattr(self._enumerator, "iter_pages", None)

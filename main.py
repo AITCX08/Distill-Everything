@@ -147,6 +147,21 @@ def _require_platform(manager, platform: str):
         ) from exc
 
 
+def _build_douyin_sidecar(config):
+    """Return a sidecar client unless the user forced the browser route."""
+
+    from src.platforms.douyin.sidecar import DouyinSidecar
+
+    source = (getattr(config.douyin, "source", "auto") or "auto").strip().lower()
+    if source == "browser":
+        return None
+    sidecar = DouyinSidecar(
+        config.douyin.sidecar_url,
+        timeout=config.douyin.sidecar_timeout,
+    )
+    return sidecar
+
+
 def build_platform_manager(config):
     from src.platforms.bilibili import BilibiliAdapter
     from src.platforms.douyin import DouyinAdapter, DouyinSession
@@ -159,7 +174,11 @@ def build_platform_manager(config):
             config.data_dir,
             profile_dir=config.douyin.profile_dir,
             login_timeout=config.douyin.login_timeout,
-        )
+        ),
+        sidecar=_build_douyin_sidecar(config),
+        sidecar_required=(
+            (getattr(config.douyin, "source", "auto") or "auto").strip().lower() == "sidecar"
+        ),
     )
     return PlatformManager(
         PlatformRegistry([BilibiliAdapter(config), douyin, YoutubeAdapter()])

@@ -1,0 +1,22 @@
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "has_more": false,
+    "medias": [
+      {
+        "bvid": "BV1mT41187DD",
+        "type": 2,
+        "attr": 0,
+        "title": "「黑貓」把 Mac mini 用作家用服务器",
+        "page": 1,
+        "duration": 1002,
+        "pubtime": 1700000000,
+        "cover": "http://i0.hdslb.com/bfs/archive/example.jpg",
+        "upper": {
+          "name": "黑貓"
+        }
+      }
+    ]
+  }
+}

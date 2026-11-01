@@ -85,6 +85,9 @@ class DouyinConfig(BaseModel):
         description="Playwright persistent profile directory",
     )
     login_timeout: int = Field(default=180, ge=30)
+    source: str = Field(default="auto", description="auto | sidecar | browser")
+    sidecar_url: str = Field(default="http://127.0.0.1:8000")
+    sidecar_timeout: float = Field(default=30.0, gt=0)
 
 
 class DistillationConfig(BaseModel):
@@ -215,6 +218,9 @@ def load_config() -> AppConfig:
         douyin=DouyinConfig(
             profile_dir=Path(os.getenv("DOUYIN_PROFILE_DIR", str(data_dir / "browser" / "douyin"))),
             login_timeout=int(os.getenv("DOUYIN_LOGIN_TIMEOUT", "180")),
+            source=os.getenv("DOUYIN_SOURCE", "auto").strip().lower() or "auto",
+            sidecar_url=os.getenv("DOUYIN_SIDECAR_URL", "http://127.0.0.1:8000"),
+            sidecar_timeout=float(os.getenv("DOUYIN_SIDECAR_TIMEOUT", "30")),
         ),
         distillation=DistillationConfig(
             download_workers=int(os.getenv("DISTILL_DOWNLOAD_WORKERS", "3")),

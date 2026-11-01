@@ -1,0 +1,48 @@
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "has_more": true,
+    "medias": [
+      {
+        "bvid": "BV1qbL56CE1D",
+        "type": 2,
+        "attr": 1,
+        "title": "已失效视频",
+        "page": 1,
+        "duration": 250,
+        "pubtime": 1778942887,
+        "cover": "http://i0.hdslb.com/bfs/archive/be27fd62c99036dce67efface486fb0a88ffed06.jpg",
+        "upper": {
+          "name": "卷卷姐juan"
+        }
+      },
+      {
+        "bvid": "BV1wzfcBQEE6",
+        "type": 2,
+        "attr": 0,
+        "title": "春节走亲戚，亲戚问我有什么才艺…",
+        "page": 1,
+        "duration": 32,
+        "pubtime": 1771760897,
+        "cover": "http://i2.hdslb.com/bfs/archive/1358cd0ca3d797de77695b8636b8ba67559f51d2.jpg",
+        "upper": {
+          "name": "仙女110"
+        }
+      },
+      {
+        "bvid": "BV1hzqrBtEMP",
+        "type": 2,
+        "attr": 0,
+        "title": "欧洲旅游VLOG | 巴塞罗那 罗马 梵蒂冈 威尼斯 米兰 苏黎世 因特拉肯 巴黎",
+        "page": 1,
+        "duration": 1479,
+        "pubtime": 1766234910,
+        "cover": "http://i2.hdslb.com/bfs/archive/5122d721b77929382e8e1ed1737e11afcd681f46.jpg",
+        "upper": {
+          "name": "DIYgod"
+        }
+      }
+    ]
+  }
+}
