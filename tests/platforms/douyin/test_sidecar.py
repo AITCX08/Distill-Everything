@@ -209,3 +209,29 @@ def test_sidecar_enumerator_is_the_shared_paging_engine():
 
     assert [len(page.items) for page in pages] == [1, 1]
     assert pages[-1].checkpoint.complete is True
+
+
+def test_auth_status_reports_the_sidecar_when_it_is_reachable():
+    sidecar = FakeSidecar({})
+    adapter = DouyinAdapter(None, sidecar=sidecar)
+
+    status = adapter.auth_status()
+
+    assert status.status == "configured"
+    assert "sidecar" in status.message
+
+
+def test_auth_status_falls_back_to_the_browser_profile_when_sidecar_is_down():
+    class _Session:
+        def auth_status(self):
+            from src.platforms.models import AuthStatus
+
+            return AuthStatus("missing", "在「平台与登录」页内扫码登录抖音")
+
+    sidecar = FakeSidecar({})
+    sidecar.available = False
+
+    status = DouyinAdapter(_Session(), sidecar=sidecar).auth_status()
+
+    assert status.status == "missing"
+    assert "扫码" in status.message

@@ -89,7 +89,35 @@ DOUYIN_SIDECAR_URL=http://127.0.0.1:8000
 DOUYIN_SIDECAR_TIMEOUT=30
 ```
 
-`auto` 语义：探活 `GET /openapi.json` 成功 → sidecar；否则 browser。**不需要 Docker**：sidecar 是普通 Python 应用，可用独立 venv 或 WSL2 运行；本机已有 Chrome/Edge 时，浏览器模式无需下载 Playwright Chromium（`launch_persistent_context` 会按 `bundled → chrome → msedge` 顺序回退）。sidecar 返回 4xx/5xx 时**不自动降级**（避免重复枚举），直接把错误抛给上层。
+`auto` 语义：探活 `GET /openapi.json` 成功 → sidecar；否则 browser。**不需要 Docker**：sidecar 是普通 Python 应用，可用独立 venv 或 WSL2 运行；本机已有 Chrome/Edge 时，浏览器模式无需下载 Playwright Chromium（`launch_persistent_context` 会按 `bundled → chrome → msedge` 顺序回退）。
+
+#### 本机运行（无 Docker，已验证）
+
+v5 需要 PostgreSQL + Redis，本机单用户不划算；用 **V4.1.2**（纯 Python 单进程）即可，本项目的客户端端点默认就是按它写的。
+
+```powershell
+# 1) 克隆（放到 .local-artifacts，已被 git 忽略）
+git clone --depth 1 https://github.com/Evil0ctal/Douyin_TikTok_Download_API.git .local-artifacts/douyin-sidecar
+cd .local-artifacts/douyin-sidecar
+git fetch --depth 1 origin tag V4.1.2; git checkout V4.1.2
+
+# 2) 依赖装进项目自己的 conda 环境（Distill-Everything，Python 3.12）
+pip install aiofiles browser-cookie3 lz4 importlib_resources pyfiglet pypng `
+            pywebio pywebio-battery tornado ua-parser user-agents gmssl tenacity
+
+# 3) httpx>=0.28 已移除 proxies= 参数，V4 代码需要去掉该参数（3 个文件、9 处）
+#    见 .local-artifacts/patch_sidecar_httpx.py 的做法
+
+# 4) 启动
+.\scripts\start-douyin-sidecar.ps1 -Port 8000
+# 或：python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+验证：`GET http://127.0.0.1:8000/openapi.json` 返回 200，且包含
+`/api/douyin/web/fetch_user_post_videos`、`fetch_user_collection_videos`、`fetch_user_mix_videos`、`fetch_one_video`。
+
+> 依赖不要按 V4 的 `requirements.txt` 钉版本安装：它会把 `fastapi` 降到 0.110、`pydantic` 降到 2.7，
+> 与主项目的 `fastapi>=0.116,<0.117` 冲突。按上面的清单安装未钉版本的包即可。sidecar 返回 4xx/5xx 时**不自动降级**（避免重复枚举），直接把错误抛给上层。
 
 ### 3.3 小红书
 

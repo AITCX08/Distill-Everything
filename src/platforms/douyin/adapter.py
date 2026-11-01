@@ -67,13 +67,16 @@ class DouyinAdapter:
         self._sidecar_checked = False
         self._sidecar_ok = False
 
-    def _sidecar_ready(self) -> bool:
+    def _sidecar_online(self) -> bool:
         if self._sidecar is None:
             return False
         if not self._sidecar_checked:
             self._sidecar_ok = self._sidecar.is_available()
             self._sidecar_checked = True
-        return self._sidecar_ok or self._sidecar_required
+        return self._sidecar_ok
+
+    def _sidecar_ready(self) -> bool:
+        return self._sidecar_online() or self._sidecar_required
 
     def _sidecar_requester(self, creator: SourceCreator):
         """Choose the sidecar endpoint for this target, or ``None`` to fall back."""
@@ -114,6 +117,8 @@ class DouyinAdapter:
         return hostname == "douyin.com" or hostname.endswith(".douyin.com")
 
     def auth_status(self) -> AuthStatus:
+        if self._sidecar_online():
+            return AuthStatus("configured", "抖音 sidecar 已连接")
         return self.session.auth_status()
 
     def authenticate(self, *, headful: bool) -> None:
