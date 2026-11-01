@@ -156,13 +156,22 @@ def block_heavy_resources(context: Any) -> None:
     except Exception:
         pass
 
-def _click_login_trigger(page: Any) -> bool:
-    """Mount the login modal; a missing entry is fine (it may already be open)."""
+def _click_login_trigger(page: Any, *, timeout_ms: int = 8_000) -> bool:
+    """Click the login entry as soon as it exists（不设固定 sleep）。"""
 
-    try:
-        return bool(page.evaluate(_CLICK_LOGIN_JS))
-    except Exception:
-        return False
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        try:
+            if page.evaluate(_CLICK_LOGIN_JS):
+                return True
+        except Exception:
+            return False
+        if time.monotonic() >= deadline:
+            return False
+        try:
+            page.wait_for_timeout(200)
+        except Exception:
+            return False
 
 
 def _switch_to_qr_tab(page: Any) -> bool:
@@ -174,22 +183,21 @@ def _switch_to_qr_tab(page: Any) -> bool:
         return False
 
 
-def capture_login_qr(page: Any, *, attempts: int = 18, wait_ms: int = 600) -> bytes | None:
+def capture_login_qr(page: Any, *, attempts: int = 50, wait_ms: int = 400) -> bytes | None:
     """Return a PNG screenshot of the Douyin login QR, or ``None``.
 
-    The panel contains several small ``data:image`` icons (refresh, logo), so the
-    largest qualifying image is marked first instead of taking the first match.
+    面板、页签、二维码都是异步渲染的，这里不设固定 sleep：每轮先确保面板存在
+    （不存在就再点一次登录入口），再切页签并抓最大的一张 data:image。
     """
 
-    _click_login_trigger(page)
-    try:
-        page.wait_for_selector(_LOGIN_PANEL, state="attached", timeout=8_000)
-    except Exception:
-        pass
-    page.wait_for_timeout(800)
-    page.wait_for_timeout(1_500)
-    _switch_to_qr_tab(page)
-    for _ in range(attempts):
+    deadline = time.monotonic() + attempts * wait_ms / 1000
+    while time.monotonic() < deadline:
+        try:
+            if not page.locator(_LOGIN_PANEL).count():
+                _click_login_trigger(page, timeout_ms=1)
+        except Exception:
+            pass
+        _switch_to_qr_tab(page)
         try:
             if page.evaluate(_MARK_QR_JS):
                 locator = page.locator('[data-qr-candidate="1"]').first
@@ -331,8 +339,12 @@ class DouyinLoginCoordinator:
                         pass
                 block_heavy_resources(context)
                 page = self._session.first_page(context)
-                page.goto(self._page_url, wait_until="domcontentloaded", timeout=30_000)
-                page.wait_for_timeout(2_500)
+                page.goto(self._page_url, wait_until="commit", timeout=30_000)
+                self._update(
+                    operation_id,
+                    status="preparing_qr",
+                    message="正在打开登录页并生成二维码（约 10-15 秒）",
+                )
                 png = self._qr_capture(page)
                 if png:
                     self._update(
