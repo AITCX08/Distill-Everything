@@ -22,6 +22,7 @@ type Platform = {
   item_types: string[];
   requires_browser: boolean;
   requires_auth: boolean;
+  qr_login: boolean;
   auth_status: string;
   auth_message: string;
 };
@@ -42,6 +43,7 @@ function isPlatform(value: unknown): value is Platform {
     && "item_types" in value && Array.isArray(value.item_types)
     && "requires_browser" in value && typeof value.requires_browser === "boolean"
     && "requires_auth" in value && typeof value.requires_auth === "boolean"
+    && "qr_login" in value && typeof value.qr_login === "boolean"
     && "auth_status" in value && typeof value.auth_status === "string"
     && "auth_message" in value && typeof value.auth_message === "string";
 }
@@ -185,7 +187,7 @@ export function PlatformsPage() {
             </div>
             <Text className="metric">支持 {platform.item_types.map(itemTypeLabel).join("、") || "未声明类型"}</Text>
             <Text>{displayAuthMessage(platform)}</Text>
-            {platform.requires_auth && platform.requires_browser && <Button
+            {platform.requires_auth && platform.qr_login && <Button
               appearance="primary"
               onClick={() => void openLogin(platform)}
               disabled={loginPending !== null}

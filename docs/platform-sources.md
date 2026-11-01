@@ -143,6 +143,10 @@ pip install aiofiles browser-cookie3 lz4 importlib_resources pyfiglet pypng `
 | 图文 / 视频下载 | 自研 | 图集按序落盘，视频走 CDN | — | — |
 | 创作者中心 | 浏览器 XHR | `creator.xiaohongshu.com/api/*` | 是 | — |
 
+登录：**Dashboard 页内扫码**。`POST /api/v1/platforms/xiaohongshu/login` 会代理到 sidecar 的
+`POST /xhs/login`，二维码由 Spider_XHS 的 `qr_url` 本地渲染成 PNG，前端弹窗直接显示；
+扫码成功后 sidecar 落盘 cookie 并重建会话，平台状态随之变为「已登录」。
+
 小红书 sidecar 已落地为 `scripts/xhs_sidecar.py`（FastAPI + Spider_XHS），登录用 `scripts/xhs_login.py`（终端扫码，无需浏览器）：
 
 ```text

@@ -58,6 +58,10 @@ class XhsAdapter:
         self._http_get = http_get or requests.get
         self._resolver = resolver
 
+    @property
+    def sidecar(self) -> Any:
+        return self._sidecar
+
     # -- platform contract ----------------------------------------------
     def matches(self, target: str) -> bool:
         text = (target or "").strip()

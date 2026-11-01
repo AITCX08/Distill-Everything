@@ -19,6 +19,7 @@ const bilibili = {
   requires_auth: true,
   auth_status: "missing",
   auth_message: "Run the Bilibili login command",
+  qr_login: true,
 };
 
 afterEach(() => {

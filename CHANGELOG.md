@@ -6,6 +6,9 @@
 
 ### 新增
 
+- 小红书 **Dashboard 页内扫码**：`XhsLoginCoordinator` 代理 sidecar 的登录接口，
+  二维码在弹窗内显示；平台卡片新增 `qr_login` 字段，小红书与 B站/抖音 一致。
+
 - 小红书 sidecar 落地：`scripts/xhs_sidecar.py` 把 Spider_XHS 封装成约定的 3 个接口，
   `scripts/xhs_login.py` 用终端二维码登录并保存 cookie；未登录时返回 409 且平台状态显示「未登录」。
 
@@ -66,6 +69,9 @@
 首个公开 Beta。核心变化是把「单机脚本流水线」升级为「多平台 + 受控 Worker + 本地 Dashboard」。
 
 ### 新增
+
+- 小红书 **Dashboard 页内扫码**：`XhsLoginCoordinator` 代理 sidecar 的登录接口，
+  二维码在弹窗内显示；平台卡片新增 `qr_login` 字段，小红书与 B站/抖音 一致。
 
 - 小红书 sidecar 落地：`scripts/xhs_sidecar.py` 把 Spider_XHS 封装成约定的 3 个接口，
   `scripts/xhs_login.py` 用终端二维码登录并保存 cookie；未登录时返回 409 且平台状态显示「未登录」。

@@ -20,6 +20,7 @@ class PlatformResponse(BaseModel):
     requires_auth: bool
     auth_status: str
     auth_message: str
+    qr_login: bool = False
 
 
 class LoginResponse(BaseModel):
@@ -30,6 +31,9 @@ class LoginResponse(BaseModel):
     qr_url: str | None = None
 
 
+_QR_LOGIN_PLATFORMS = frozenset({"bilibili", "douyin", "xiaohongshu"})
+
+
 def _platform_response(descriptor: Any, auth: Any) -> PlatformResponse:
     return PlatformResponse(
         name=descriptor.name,
@@ -38,6 +42,7 @@ def _platform_response(descriptor: Any, auth: Any) -> PlatformResponse:
         requires_auth=descriptor.requires_auth,
         auth_status=auth.status,
         auth_message=auth.message,
+        qr_login=descriptor.name in _QR_LOGIN_PLATFORMS,
     )
 
 
@@ -60,6 +65,18 @@ def _qr_coordinator(request: Request, platform: str):
         if session is None:
             return None
         logins[platform] = DouyinLoginCoordinator(session)
+        return logins[platform]
+    if platform == "xiaohongshu":
+        from src.dashboard.xhs_login import XhsLoginCoordinator
+
+        try:
+            adapter = request.app.state.service.platform_manager.get(platform)
+        except Exception:
+            return None
+        sidecar = getattr(adapter, "sidecar", None)
+        if sidecar is None:
+            return None
+        logins[platform] = XhsLoginCoordinator(sidecar)
         return logins[platform]
     return None
 
