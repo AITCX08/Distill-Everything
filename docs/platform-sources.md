@@ -89,6 +89,17 @@ DOUYIN_SIDECAR_URL=http://127.0.0.1:8000
 DOUYIN_SIDECAR_TIMEOUT=30
 ```
 
+**登录态是两套，必须桥接一次**：扫码只写进 Playwright profile，sidecar 是独立进程，读的是
+`crawlers/douyin/web/config.yaml` 里的 `headers.Cookie`。扫码后执行：
+
+```powershell
+python main.py source login douyin          # 扫码
+python main.py source sync-cookie           # 把浏览器 cookie 写进 sidecar 配置
+.\scripts\start-douyin-sidecar.ps1          # 重启 sidecar 生效
+```
+
+没有 `sessionid` 时 `sync-cookie` 会直接报错，不会写入半截 cookie。
+
 `auto` 语义：探活 `GET /openapi.json` 成功 → sidecar；否则 browser。**不需要 Docker**：sidecar 是普通 Python 应用，可用独立 venv 或 WSL2 运行；本机已有 Chrome/Edge 时，浏览器模式无需下载 Playwright Chromium（`launch_persistent_context` 会按 `bundled → chrome → msedge` 顺序回退）。
 
 #### 本机运行（无 Docker，已验证）

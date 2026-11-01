@@ -414,6 +414,28 @@ def source_login(platform, headful):
     adapter.authenticate(headful=headful)
 
 
+@source.command("sync-cookie")
+@click.option("--sidecar-dir", type=click.Path(file_okay=False), default=None)
+def source_sync_cookie(sidecar_dir):
+    """把浏览器登录态写入抖音 sidecar 配置（扫码后执行一次）。"""
+
+    from pathlib import Path
+
+    from src.config import load_config
+    from src.platforms.douyin.cookie_export import sync
+    from src.platforms.douyin.session import DouyinSession
+
+    config = load_config()
+    session = DouyinSession(
+        config.data_dir,
+        profile_dir=config.douyin.profile_dir,
+        login_timeout=config.douyin.login_timeout,
+    )
+    path, count = sync(session, Path(sidecar_dir) if sidecar_dir else None)
+    console.print(f"[green]已写入[/green] {path}（{count} 项 cookie）")
+    console.print("[yellow]重启 sidecar 后生效[/yellow]：.\\scripts\\start-douyin-sidecar.ps1")
+
+
 @source.command("creator")
 @click.argument("target")
 @click.option("--platform", type=str, default="auto")

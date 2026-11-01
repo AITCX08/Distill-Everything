@@ -30,6 +30,9 @@
 
 ### 变更
 
+- 新增 `python main.py source sync-cookie`：把浏览器扫码得到的抖音登录态写入 sidecar 的
+  `headers.Cookie`（保留配置注释，只替换 Cookie 行），解决"扫了码但 sidecar 仍 400"的断层。
+
 - 抖音浏览器会话支持复用系统 Chrome/Edge：`launch_persistent_context` 按 `bundled → chrome → msedge`
   顺序回退，未执行 `playwright install chromium` 的机器也能用；三者都不可用时给出可执行提示。
 
@@ -55,6 +58,9 @@
 - Windows 与 macOS 的安装、启动、排障及安全边界文档。
 
 ### 变更
+
+- 新增 `python main.py source sync-cookie`：把浏览器扫码得到的抖音登录态写入 sidecar 的
+  `headers.Cookie`（保留配置注释，只替换 Cookie 行），解决"扫了码但 sidecar 仍 400"的断层。
 
 - 抖音浏览器会话支持复用系统 Chrome/Edge：`launch_persistent_context` 按 `bundled → chrome → msedge`
   顺序回退，未执行 `playwright install chromium` 的机器也能用；三者都不可用时给出可执行提示。
