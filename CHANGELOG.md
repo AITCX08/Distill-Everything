@@ -30,6 +30,9 @@
 
 ### 变更
 
+- 抖音浏览器会话支持复用系统 Chrome/Edge：`launch_persistent_context` 按 `bundled → chrome → msedge`
+  顺序回退，未执行 `playwright install chromium` 的机器也能用；三者都不可用时给出可执行提示。
+
 - 登录接口统一为 `/api/v1/platforms/<platform>/login[/<op>[/qr]]`，Bilibili 与抖音共用同一套前端弹窗。
 - 抖音认证提示改为中文页内引导，不再提示“在外部浏览器登录”。
 
@@ -52,6 +55,9 @@
 - Windows 与 macOS 的安装、启动、排障及安全边界文档。
 
 ### 变更
+
+- 抖音浏览器会话支持复用系统 Chrome/Edge：`launch_persistent_context` 按 `bundled → chrome → msedge`
+  顺序回退，未执行 `playwright install chromium` 的机器也能用；三者都不可用时给出可执行提示。
 
 - 产品与仓库名称统一为 Distill-Everything。
 - Dashboard 固定仅监听本机回环地址。

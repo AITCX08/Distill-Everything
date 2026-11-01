@@ -89,7 +89,7 @@ DOUYIN_SIDECAR_URL=http://127.0.0.1:8000
 DOUYIN_SIDECAR_TIMEOUT=30
 ```
 
-`auto` 语义：探活 `GET /` 成功且版本兼容 → sidecar；否则 browser。sidecar 返回 4xx/5xx 时**不自动降级**（避免重复枚举），直接把错误抛给上层。
+`auto` 语义：探活 `GET /openapi.json` 成功 → sidecar；否则 browser。**不需要 Docker**：sidecar 是普通 Python 应用，可用独立 venv 或 WSL2 运行；本机已有 Chrome/Edge 时，浏览器模式无需下载 Playwright Chromium（`launch_persistent_context` 会按 `bundled → chrome → msedge` 顺序回退）。sidecar 返回 4xx/5xx 时**不自动降级**（避免重复枚举），直接把错误抛给上层。
 
 ### 3.3 小红书
 

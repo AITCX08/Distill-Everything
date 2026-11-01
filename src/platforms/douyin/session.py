@@ -33,6 +33,45 @@ _LOGIN_WALL_CHECK = r"""() => {
 }"""
 
 
+_CHANNELS = ("chrome", "msedge")
+_LAUNCH_ARGS = ("--disable-blink-features=AutomationControlled",)
+
+
+def launch_persistent_context(
+    chromium: Any,
+    profile_dir: Path,
+    *,
+    headless: bool,
+) -> Any:
+    """Return a persistent context, falling back to an installed Chrome/Edge."""
+
+    errors: list[str] = []
+    try:
+        return chromium.launch_persistent_context(
+            str(profile_dir),
+            headless=headless,
+            args=_LAUNCH_ARGS,
+        )
+    except Exception as exc:  # bundled Chromium missing or broken
+        errors.append(f"bundled={exc}")
+
+    for channel in _CHANNELS:
+        try:
+            return chromium.launch_persistent_context(
+                str(profile_dir),
+                headless=headless,
+                channel=channel,
+                args=_LAUNCH_ARGS,
+            )
+        except Exception as exc:
+            errors.append(f"{channel}={exc}")
+
+    raise PlatformDependencyError(
+        "没有可用的 Chromium：请安装 Chrome/Edge，或执行 `playwright install chromium`；"
+        f"尝试记录：{'; '.join(errors)[:400]}"
+    )
+
+
 @contextmanager
 def _playwright_browser(profile_dir: Path, *, headless: bool) -> Iterator[Any]:
     try:
@@ -45,16 +84,11 @@ def _playwright_browser(profile_dir: Path, *, headless: bool) -> Iterator[Any]:
     playwright = sync_playwright().start()
     context = None
     try:
-        try:
-            context = playwright.chromium.launch_persistent_context(
-                str(profile_dir),
-                headless=headless,
-                args=("--disable-blink-features=AutomationControlled",),
-            )
-        except Exception as exc:
-            raise PlatformDependencyError(
-                "Chromium is unavailable; run `playwright install chromium`"
-            ) from exc
+        context = launch_persistent_context(
+            playwright.chromium,
+            profile_dir,
+            headless=headless,
+        )
         yield context
     finally:
         if context is not None:
