@@ -15,6 +15,35 @@ _SEC_UID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _DIRECT_RE = re.compile(r"^douyin:(?P<sec_uid>[A-Za-z0-9_.-]+)$", re.IGNORECASE)
 _COLLECTION_DIRECT_RE = re.compile(r"^douyin:collection:(?P<collection_id>\d+)$", re.IGNORECASE)
 _COLLECT_TAB_RE = re.compile(r"showtab=collect", re.IGNORECASE)
+_LIKE_TAB_RE = re.compile(r"showtab=like", re.IGNORECASE)
+_LIKES_DIRECT_RE = re.compile(r"^douyin:likes:(?P<sec_uid>[A-Za-z0-9_-]+)$", re.IGNORECASE)
+
+
+def extract_likes_target(value: str) -> tuple[str, str] | None:
+    """Return ``(creator_id, canonical_url)`` for a「喜欢」page.
+
+    - ``https://www.douyin.com/user/<sec_uid|self>?showTab=like``
+    - ``douyin:likes:<sec_uid>``
+    """
+
+    text = value.strip()
+    direct = _LIKES_DIRECT_RE.fullmatch(text)
+    if direct:
+        sec_uid = direct.group("sec_uid")
+        return f"{sec_uid}-likes", f"https://www.douyin.com/user/{sec_uid}?showTab=like"
+
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return None
+    hostname = (parsed.hostname or "").lower()
+    if hostname != "douyin.com" and not hostname.endswith(".douyin.com"):
+        return None
+    parts = [unquote(part) for part in parsed.path.split("/") if part]
+    if len(parts) >= 2 and parts[0] == "user" and _LIKE_TAB_RE.search(parsed.query or ""):
+        who = parts[1] if _SEC_UID_RE.fullmatch(parts[1]) else "self"
+        return f"{who}-likes", f"https://www.douyin.com/user/{who}?showTab=like"
+    return None
 
 
 def extract_collection_target(value: str) -> tuple[str, str] | None:

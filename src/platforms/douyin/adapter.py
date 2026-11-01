@@ -10,10 +10,15 @@ from urllib.parse import urlparse
 from src.platforms.douyin.resolver import (
     DouyinResolver,
     extract_collection_target,
+    extract_likes_target,
     extract_sec_uid,
     extract_target_url,
 )
-from src.platforms.douyin.cookie_export import DEFAULT_SIDECAR_DIR, has_sidecar_cookie
+from src.platforms.douyin.cookie_export import (
+    DEFAULT_SIDECAR_DIR,
+    has_sidecar_cookie,
+    read_sidecar_cookie,
+)
 from src.platforms.douyin.enumerator import DouyinBrowserRoute, DouyinEnumerator
 from src.platforms.douyin.downloader import DouyinDownloader
 from src.platforms.douyin.enumerator import map_aweme
@@ -92,12 +97,19 @@ class DouyinAdapter:
             return lambda _creator, cursor: self._sidecar.user_mix(
                 mix_id, cursor=int(cursor or 0)
             )
-        if "showtab=collect" in url:
-            sec_uid = str(creator.creator_id).removesuffix("-collect")
+        if "showtab=like" in url:
+            sec_uid = str(creator.creator_id).removesuffix("-likes")
             if not sec_uid or sec_uid == "self":
-                return None  # 「我的收藏」只有浏览器里的登录态知道是谁
-            return lambda _creator, cursor: self._sidecar.user_collection(
+                return None  # 自己的 sec_uid 需要登录态才知道
+            return lambda _creator, cursor: self._sidecar.user_likes(
                 sec_uid, cursor=int(cursor or 0)
+            )
+        if "showtab=collect" in url:
+            cookie = read_sidecar_cookie(self._sidecar_dir)
+            if not cookie:
+                return None  # 「我的收藏」走 cookie，没有登录态就回退浏览器
+            return lambda _creator, cursor: self._sidecar.user_collection(
+                cookie, cursor=int(cursor or 0)
             )
         sec_uid = str(creator.creator_id)
         if not sec_uid or sec_uid.endswith("-collection"):
@@ -133,6 +145,18 @@ class DouyinAdapter:
         self.session.authenticate(headful=headful)
 
     def resolve(self, target: str) -> ResolvedTarget:
+        likes = extract_likes_target(target.strip())
+        if likes is not None:
+            creator_id, canonical_url = likes
+            return ResolvedTarget(
+                platform="douyin",
+                creator_id=creator_id,
+                canonical_url=canonical_url,
+                original_target=target,
+                target_type="collection",
+                metadata={"kind": "likes"},
+            )
+
         collection = self._resolver_factory(None).resolve_collection(target)
         if collection is not None:
             return collection
@@ -149,11 +173,12 @@ class DouyinAdapter:
 
     def get_creator(self, target: ResolvedTarget) -> SourceCreator:
         if target.target_type == "collection":
-            label = (
-                "我的收藏"
-                if target.creator_id.endswith("-collect")
-                else f"抖音合集 {target.creator_id.split('-')[0]}"
-            )
+            if target.creator_id.endswith("-likes"):
+                label = "我喜欢的视频"
+            elif target.creator_id.endswith("-collect"):
+                label = "我的收藏"
+            else:
+                label = f"抖音合集 {target.creator_id.split('-')[0]}"
             return SourceCreator(
                 platform="douyin",
                 creator_id=target.creator_id,

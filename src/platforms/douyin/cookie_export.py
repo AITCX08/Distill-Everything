@@ -79,3 +79,19 @@ def has_sidecar_cookie(sidecar_dir: Path | None = None) -> bool:
     if not match:
         return False
     return "sessionid=" in match.group(0)
+
+
+def read_sidecar_cookie(sidecar_dir: Path | None = None) -> str:
+    """Return the cookie header stored in the sidecar config ("" when absent)."""
+
+    root = Path(sidecar_dir) if sidecar_dir else DEFAULT_SIDECAR_DIR
+    config_path = root / DOUYIN_CONFIG
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = COOKIE_LINE_RE.search(text)
+    if not match:
+        return ""
+    value = match.group(0).split("Cookie:", 1)[-1].strip()
+    return value if "sessionid=" in value else ""

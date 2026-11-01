@@ -21,6 +21,7 @@ DEFAULT_TIMEOUT = 30.0
 DEFAULT_PATHS: Mapping[str, str] = {
     "one_video": "/api/douyin/web/fetch_one_video",
     "user_post": "/api/douyin/web/fetch_user_post_videos",
+    "user_like": "/api/douyin/web/fetch_user_like_videos",
     "user_collection": "/api/douyin/web/fetch_user_collection_videos",
     "user_mix": "/api/douyin/web/fetch_user_mix_videos",
     "profile": "/api/douyin/web/handler_user_profile",
@@ -78,10 +79,18 @@ class DouyinSidecar:
             {"sec_user_id": sec_user_id, "max_cursor": cursor, "count": count},
         )
 
-    def user_collection(self, sec_user_id: str, *, cursor: int = 0, count: int = 20) -> dict[str, Any]:
+    def user_likes(self, sec_user_id: str, *, cursor: int = 0, count: int = 20) -> dict[str, Any]:
+        return self._request(
+            "user_like",
+            {"sec_user_id": sec_user_id, "max_cursor": cursor, "counts": count},
+        )
+
+    def user_collection(self, cookie: str, *, cursor: int = 0, count: int = 20) -> dict[str, Any]:
+        """「我的收藏」走 cookie，不接受 sec_user_id（V4 接口定义如此）。"""
+
         return self._request(
             "user_collection",
-            {"sec_user_id": sec_user_id, "max_cursor": cursor, "count": count},
+            {"cookie": cookie, "max_cursor": cursor, "counts": count},
         )
 
     def user_mix(self, mix_id: str, *, cursor: int = 0, count: int = 20) -> dict[str, Any]:

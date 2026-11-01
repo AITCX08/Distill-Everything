@@ -98,8 +98,12 @@ class FakeSidecar:
         self.calls.append(("posts", sec_user_id, cursor))
         return self.pages.get(int(cursor), {"aweme_list": [], "has_more": 0})
 
-    def user_collection(self, sec_user_id, *, cursor=0, count=20):
-        self.calls.append(("collection", sec_user_id, cursor))
+    def user_likes(self, sec_user_id, *, cursor=0, count=20):
+        self.calls.append(("likes", sec_user_id, cursor))
+        return self.pages.get(int(cursor), {"aweme_list": [], "has_more": 0})
+
+    def user_collection(self, cookie, *, cursor=0, count=20):
+        self.calls.append(("collection", cookie, cursor))
         return self.pages.get(int(cursor), {"aweme_list": [], "has_more": 0})
 
     def user_mix(self, mix_id, *, cursor=0, count=20):
@@ -154,16 +158,22 @@ def test_collection_links_use_the_mix_endpoint():
     assert sidecar.calls[0] == ("mix", "7123", 0)
 
 
-def test_collect_tab_uses_the_user_collection_endpoint():
+def test_collect_tab_uses_cookie_backed_collection(tmp_path):
+    from src.platforms.douyin.cookie_export import DOUYIN_CONFIG
+
+    config = tmp_path / DOUYIN_CONFIG
+    config.parent.mkdir(parents=True)
+    config.write_text("headers:\n  Cookie: sessionid=abc; ttwid=x\n", encoding="utf-8")
     sidecar = FakeSidecar({0: {"aweme_list": [make_aweme("3001")], "has_more": 0}})
-    adapter = DouyinAdapter(None, sidecar=sidecar)
+    adapter = DouyinAdapter(None, sidecar=sidecar, sidecar_dir=tmp_path)
     creator = make_creator(
-        "https://www.douyin.com/user/MS4wLjAB_x?showTab=collect", "MS4wLjAB_x-collect"
+        "https://www.douyin.com/user/self?showTab=collect", "self-collect"
     )
 
     list(adapter.iter_items(creator, checkpoint=None))
 
-    assert sidecar.calls[0] == ("collection", "MS4wLjAB_x", 0)
+    assert sidecar.calls[0][0] == "collection"
+    assert sidecar.calls[0][1] == "sessionid=abc; ttwid=x"
 
 
 def test_self_collect_falls_back_to_the_browser_route():
@@ -255,3 +265,27 @@ def test_auth_status_falls_back_to_the_browser_profile_when_sidecar_is_down():
 
     assert status.status == "missing"
     assert "扫码" in status.message
+
+
+def test_like_tab_uses_the_like_endpoint():
+    sidecar = FakeSidecar({0: {"aweme_list": [make_aweme("4001")], "has_more": 0}})
+    adapter = DouyinAdapter(None, sidecar=sidecar)
+    creator = make_creator(
+        "https://www.douyin.com/user/MS4wLjAB_x?showTab=like", "MS4wLjAB_x-likes"
+    )
+
+    list(adapter.iter_items(creator, checkpoint=None))
+
+    assert sidecar.calls[0] == ("likes", "MS4wLjAB_x", 0)
+
+
+def test_likes_target_resolves_from_url_and_explicit_form():
+    adapter = DouyinAdapter(None, sidecar=FakeSidecar({}))
+
+    from_url = adapter.resolve("https://www.douyin.com/user/MS4wLjAB_x?showTab=like")
+    from_direct = adapter.resolve("douyin:likes:MS4wLjAB_y")
+
+    assert from_url.target_type == "collection"
+    assert from_url.creator_id == "MS4wLjAB_x-likes"
+    assert from_direct.metadata == {"kind": "likes"}
+    assert adapter.get_creator(from_url).display_name == "我喜欢的视频"
