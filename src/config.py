@@ -90,6 +90,13 @@ class DouyinConfig(BaseModel):
     sidecar_timeout: float = Field(default=30.0, gt=0)
 
 
+class XhsConfig(BaseModel):
+    """小红书 sidecar 配置。"""
+    source: str = Field(default="sidecar", description="sidecar | off")
+    sidecar_url: str = Field(default="http://127.0.0.1:8001")
+    timeout: float = Field(default=30.0, gt=0)
+
+
 class DistillationConfig(BaseModel):
     """跨平台蒸馏的发布默认值。"""
     emit: tuple[str, ...] = ("episodes", "skill")
@@ -117,6 +124,7 @@ class AppConfig(BaseModel):
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     funasr: FunASRConfig = Field(default_factory=FunASRConfig)
     feishu: FeishuConfig = Field(default_factory=FeishuConfig)
+    xhs: XhsConfig = Field(default_factory=XhsConfig)
     douyin: DouyinConfig = Field(default_factory=DouyinConfig)
     distillation: DistillationConfig = Field(default_factory=DistillationConfig)
 
@@ -221,6 +229,11 @@ def load_config() -> AppConfig:
             source=os.getenv("DOUYIN_SOURCE", "auto").strip().lower() or "auto",
             sidecar_url=os.getenv("DOUYIN_SIDECAR_URL", "http://127.0.0.1:8000"),
             sidecar_timeout=float(os.getenv("DOUYIN_SIDECAR_TIMEOUT", "30")),
+        ),
+        xhs=XhsConfig(
+            source=os.getenv("XHS_SOURCE", "sidecar").strip().lower() or "sidecar",
+            sidecar_url=os.getenv("XHS_SIDECAR_URL", "http://127.0.0.1:8001"),
+            timeout=float(os.getenv("XHS_SIDECAR_TIMEOUT", "30")),
         ),
         distillation=DistillationConfig(
             download_workers=int(os.getenv("DISTILL_DOWNLOAD_WORKERS", "3")),

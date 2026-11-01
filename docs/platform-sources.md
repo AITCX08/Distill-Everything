@@ -101,6 +101,18 @@ DOUYIN_SIDECAR_TIMEOUT=30
 | 图文 / 视频下载 | 自研 | 图集按序落盘，视频走 CDN | — | — |
 | 创作者中心 | 浏览器 XHR | `creator.xiaohongshu.com/api/*` | 是 | — |
 
+小红书 sidecar 契约（Spider_XHS 是库不是服务，需要一层薄封装；本项目的客户端只认这 3 个路径）：
+
+```text
+GET /openapi.json                     探活
+GET /xhs/note?note_id={id}            → {note_id, title, desc, video_url, images[], cover, author{nickname}, liked, url}
+GET /xhs/user/notes?user_id=&cursor=  → {items[], cursor, has_more, total}
+GET /xhs/user/collect?user_id=&cursor= → 同上
+```
+
+对应 Spider_XHS 的真实端点：`/api/sns/web/v1/feed`、`/api/sns/web/v1/user_posted`、
+`/api/sns/web/v2/note/collect/page`。路径可用 `paths=` 覆盖，v5 改版时只改 client 构造参数。
+
 ### 3.4 创作者中心（Insights）
 
 三平台统一实现：
@@ -143,8 +155,9 @@ DOUYIN_SIDECAR_TIMEOUT=30
 | `DOUYIN_SIDECAR_URL` | `http://127.0.0.1:8000` | ✅ 已实现 | sidecar 地址 |
 | `DOUYIN_SIDECAR_TIMEOUT` | `30` | ✅ 已实现 | 单请求超时（秒） |
 | `BILIBILI_FETCH_FAV` | `1` | ⏳ 计划 | 关闭时收藏夹能力直接报未启用 |
-| `XHS_SOURCE` | `sidecar` | ⏳ 计划 | `sidecar` / `browser` |
-| `XHS_SIDECAR_URL` | `http://127.0.0.1:8001` | ⏳ 计划 | 小红书 sidecar 地址 |
+| `XHS_SOURCE` | `sidecar` | ✅ 已实现 | `sidecar` / `off` |
+| `XHS_SIDECAR_URL` | `http://127.0.0.1:8001` | ✅ 已实现 | 小红书 sidecar 地址 |
+| `XHS_SIDECAR_TIMEOUT` | `30` | ✅ 已实现 | 小红书 sidecar 超时（秒） |
 | `INSIGHTS_ENABLED` | `0` | ⏳ 计划 | 创作者中心采集开关（默认关，避免误触后台） |
 
 ## 6. 里程碑与验收

@@ -147,6 +147,19 @@ def _require_platform(manager, platform: str):
         ) from exc
 
 
+def _build_xhs_adapter(config):
+    """Register Xiaohongshu unless the user turned it off."""
+
+    from src.platforms.xhs import XhsAdapter
+    from src.platforms.xhs.sidecar import XhsSidecar
+
+    if (getattr(config.xhs, "source", "sidecar") or "sidecar").strip().lower() == "off":
+        return None
+    return XhsAdapter(
+        XhsSidecar(config.xhs.sidecar_url, timeout=config.xhs.timeout)
+    )
+
+
 def _build_douyin_sidecar(config):
     """Return a sidecar client unless the user forced the browser route."""
 
@@ -181,7 +194,14 @@ def build_platform_manager(config):
         ),
     )
     return PlatformManager(
-        PlatformRegistry([BilibiliAdapter(config), douyin, YoutubeAdapter()])
+        PlatformRegistry(
+            [
+                BilibiliAdapter(config),
+                douyin,
+                YoutubeAdapter(),
+                *([_build_xhs_adapter(config)] if _build_xhs_adapter(config) else []),
+            ]
+        )
     )
 
 

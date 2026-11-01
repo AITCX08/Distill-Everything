@@ -6,6 +6,14 @@
 
 ### 新增
 
+- **小红书平台支持**：新增 `src/platforms/xhs/`，支持笔记链接（含 `xhslink.com` 短链）、
+  用户主页、收藏（`xhs:collect:<user_id>`）与图文/视频下载；走 Spider_XHS 风格的
+  sidecar 契约（`/xhs/note`、`/xhs/user/notes`、`/xhs/user/collect`），路径可覆盖。
+- **B站收藏夹**：`space.bilibili.com/{mid}/favlist?fid=` / `bilibili:fav:{fid}`，
+  三个公开 GET，按 `attr==1` 过滤失效条目。
+- **抖音 sidecar**：`DOUYIN_SOURCE=auto|sidecar|browser`，端点取自 Evil0ctal V4.1.2。
+- **开发文档**：`docs/platform-sources.md`（四层架构、三平台接口清单、配置、里程碑、验证记录）。
+
 - **MCP Server**：`python main.py mcp`（stdio / sse / streamable-http），暴露 9 个工具
   （`distill_list_platforms`、`distill_preview`、`distill_create_job`、`distill_list_jobs`、
   `distill_get_job`、`distill_list_job_items`、`distill_list_artifacts`、`distill_read_artifact`、
