@@ -143,7 +143,7 @@ pip install aiofiles browser-cookie3 lz4 importlib_resources pyfiglet pypng `
 | 图文 / 视频下载 | 自研 | 图集按序落盘，视频走 CDN | — | — |
 | 创作者中心 | 浏览器 XHR | `creator.xiaohongshu.com/api/*` | 是 | — |
 
-小红书 sidecar 契约（Spider_XHS 是库不是服务，需要一层薄封装；本项目的客户端只认这 3 个路径）：
+小红书 sidecar 已落地为 `scripts/xhs_sidecar.py`（FastAPI + Spider_XHS），登录用 `scripts/xhs_login.py`（终端扫码，无需浏览器）：
 
 ```text
 GET /openapi.json                     探活

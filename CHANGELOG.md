@@ -6,6 +6,9 @@
 
 ### 新增
 
+- 小红书 sidecar 落地：`scripts/xhs_sidecar.py` 把 Spider_XHS 封装成约定的 3 个接口，
+  `scripts/xhs_login.py` 用终端二维码登录并保存 cookie；未登录时返回 409 且平台状态显示「未登录」。
+
 - **创作者中心采集（Insights）**：`python main.py insights --platform bilibili|douyin|xiaohongshu`
   用已登录的持久 profile 打开后台并拦截 XHR，归一化为 `InsightsSnapshot`（缺失指标保持 `null`，
   不会误记成 0）；默认关闭，需 `INSIGHTS_ENABLED=1`。
@@ -63,6 +66,9 @@
 首个公开 Beta。核心变化是把「单机脚本流水线」升级为「多平台 + 受控 Worker + 本地 Dashboard」。
 
 ### 新增
+
+- 小红书 sidecar 落地：`scripts/xhs_sidecar.py` 把 Spider_XHS 封装成约定的 3 个接口，
+  `scripts/xhs_login.py` 用终端二维码登录并保存 cookie；未登录时返回 409 且平台状态显示「未登录」。
 
 - Source Adapter 平台层与 episodes、Skill、RAG 分块三类输出层。
 - 受控 Worker：每个作品在独立子进程中完成下载、音频、转写、摘要和交付，可暂停、恢复与重试。

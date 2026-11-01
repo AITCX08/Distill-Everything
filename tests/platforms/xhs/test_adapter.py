@@ -183,3 +183,47 @@ def test_checkpoint_skips_known_notes():
     )
 
     assert pages[0].items == ()
+
+
+class _SessionTransport:
+    def __init__(self, authenticated, *, fail=False):
+        self.authenticated = authenticated
+        self.fail = fail
+
+    def __call__(self, url, _params):
+        if self.fail:
+            raise ConnectionError("down")
+        if url.endswith("/xhs/session"):
+            return {"authenticated": self.authenticated}
+        return {}
+
+
+def test_sidecar_reports_authentication_state():
+    from src.platforms.xhs.sidecar import XhsSidecar
+
+    logged_in = XhsSidecar("http://127.0.0.1:8001", http_get=_SessionTransport(True))
+    logged_out = XhsSidecar("http://127.0.0.1:8001", http_get=_SessionTransport(False))
+
+    assert logged_in.is_authenticated() is True
+    assert logged_out.is_authenticated() is False
+
+
+def test_adapter_status_distinguishes_connected_from_logged_in():
+    from src.platforms.xhs.adapter import XhsAdapter
+
+    class _Sidecar:
+        def __init__(self, authenticated):
+            self.authenticated = authenticated
+
+        def is_available(self):
+            return True
+
+        def is_authenticated(self):
+            return self.authenticated
+
+    logged_out = XhsAdapter(_Sidecar(False)).auth_status()
+    logged_in = XhsAdapter(_Sidecar(True)).auth_status()
+
+    assert logged_out.status == "missing"
+    assert "xhs_login" in logged_out.message
+    assert logged_in.status == "configured"

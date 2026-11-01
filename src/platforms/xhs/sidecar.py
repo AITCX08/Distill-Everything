@@ -19,6 +19,7 @@ DEFAULT_PATHS: Mapping[str, str] = {
     "note": "/xhs/note",
     "user_notes": "/xhs/user/notes",
     "user_collect": "/xhs/user/collect",
+    "session": "/xhs/session",
 }
 
 
@@ -57,6 +58,17 @@ class XhsSidecar:
         except Exception:
             return False
         return True
+
+    def session_status(self) -> Mapping[str, Any]:
+        return self._request("session", {})
+
+    def is_authenticated(self) -> bool:
+        if not self.is_available():
+            return False
+        try:
+            return bool(self.session_status().get("authenticated"))
+        except PlatformEnumerationError:
+            return False
 
     def note(self, note_id: str) -> Mapping[str, Any]:
         return self._request("note", {"note_id": note_id})

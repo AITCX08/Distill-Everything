@@ -68,9 +68,17 @@ class XhsAdapter:
         return is_short_link(text)
 
     def auth_status(self) -> AuthStatus:
-        if self._sidecar is not None and self._sidecar.is_available():
-            return AuthStatus("configured", "小红书 sidecar 已连接")
-        return AuthStatus("missing", "启动小红书 sidecar 后即可采集（契约见 docs/platform-sources.md 3.3）")
+        if self._sidecar is None or not self._sidecar.is_available():
+            return AuthStatus(
+                "missing",
+                "启动小红书 sidecar 后即可采集（契约见 docs/platform-sources.md 3.3）",
+            )
+        if self._sidecar.is_authenticated():
+            return AuthStatus("configured", "小红书 sidecar 已登录")
+        return AuthStatus(
+            "missing",
+            "sidecar 已连接但尚未登录：运行 python scripts/xhs_login.py 扫码",
+        )
 
     def authenticate(self, *, headful: bool) -> None:
         del headful
