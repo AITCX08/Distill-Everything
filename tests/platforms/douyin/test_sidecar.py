@@ -211,14 +211,34 @@ def test_sidecar_enumerator_is_the_shared_paging_engine():
     assert pages[-1].checkpoint.complete is True
 
 
-def test_auth_status_reports_the_sidecar_when_it_is_reachable():
-    sidecar = FakeSidecar({})
-    adapter = DouyinAdapter(None, sidecar=sidecar)
+def test_auth_status_requires_a_real_sidecar_session(tmp_path):
+    """sidecar 在线但没登录不能显示「已登录」。"""
 
-    status = adapter.auth_status()
+    from src.platforms.douyin.cookie_export import DOUYIN_CONFIG
+
+    config = tmp_path / DOUYIN_CONFIG
+    config.parent.mkdir(parents=True)
+    config.write_text("headers:\n  Cookie: __ac_nonce=placeholder\n", encoding="utf-8")
+    sidecar = FakeSidecar({})
+
+    status = DouyinAdapter(None, sidecar=sidecar, sidecar_dir=tmp_path).auth_status()
+
+    assert status.status == "missing"
+    assert "sync-cookie" in status.message
+
+
+def test_auth_status_reports_configured_when_sidecar_has_a_session(tmp_path):
+    from src.platforms.douyin.cookie_export import DOUYIN_CONFIG
+
+    config = tmp_path / DOUYIN_CONFIG
+    config.parent.mkdir(parents=True)
+    config.write_text("headers:\n  Cookie: sessionid=abc; ttwid=x\n", encoding="utf-8")
+    sidecar = FakeSidecar({})
+
+    status = DouyinAdapter(None, sidecar=sidecar, sidecar_dir=tmp_path).auth_status()
 
     assert status.status == "configured"
-    assert "sidecar" in status.message
+    assert "已登录" in status.message
 
 
 def test_auth_status_falls_back_to_the_browser_profile_when_sidecar_is_down():

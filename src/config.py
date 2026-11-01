@@ -88,6 +88,7 @@ class DouyinConfig(BaseModel):
     source: str = Field(default="auto", description="auto | sidecar | browser")
     sidecar_url: str = Field(default="http://127.0.0.1:8000")
     sidecar_timeout: float = Field(default=30.0, gt=0)
+    sidecar_dir: Path = Field(default=PROJECT_ROOT / ".local-artifacts" / "douyin-sidecar")
 
 
 class XhsConfig(BaseModel):
@@ -230,6 +231,9 @@ def load_config() -> AppConfig:
             source=os.getenv("DOUYIN_SOURCE", "auto").strip().lower() or "auto",
             sidecar_url=os.getenv("DOUYIN_SIDECAR_URL", "http://127.0.0.1:8000"),
             sidecar_timeout=float(os.getenv("DOUYIN_SIDECAR_TIMEOUT", "30")),
+            sidecar_dir=Path(
+                os.getenv("DOUYIN_SIDECAR_DIR", str(PROJECT_ROOT / ".local-artifacts" / "douyin-sidecar"))
+            ),
         ),
         insights_enabled=os.getenv("INSIGHTS_ENABLED", "0").lower() in {"1", "true", "yes"},
         xhs=XhsConfig(

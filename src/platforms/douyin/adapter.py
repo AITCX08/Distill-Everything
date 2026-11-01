@@ -13,6 +13,7 @@ from src.platforms.douyin.resolver import (
     extract_sec_uid,
     extract_target_url,
 )
+from src.platforms.douyin.cookie_export import DEFAULT_SIDECAR_DIR, has_sidecar_cookie
 from src.platforms.douyin.enumerator import DouyinBrowserRoute, DouyinEnumerator
 from src.platforms.douyin.downloader import DouyinDownloader
 from src.platforms.douyin.enumerator import map_aweme
@@ -56,6 +57,7 @@ class DouyinAdapter:
         creator_loader: Callable[[ResolvedTarget], SourceCreator] | None = None,
         sidecar=None,
         sidecar_required: bool = False,
+        sidecar_dir=None,
     ) -> None:
         self.session = session
         self._resolver_factory = resolver_factory
@@ -64,6 +66,7 @@ class DouyinAdapter:
         self._creator_loader = creator_loader
         self._sidecar = sidecar
         self._sidecar_required = bool(sidecar_required)
+        self._sidecar_dir = sidecar_dir or DEFAULT_SIDECAR_DIR
         self._sidecar_checked = False
         self._sidecar_ok = False
 
@@ -118,7 +121,12 @@ class DouyinAdapter:
 
     def auth_status(self) -> AuthStatus:
         if self._sidecar_online():
-            return AuthStatus("configured", "抖音 sidecar 已连接")
+            if has_sidecar_cookie(self._sidecar_dir):
+                return AuthStatus("configured", "抖音 sidecar 已登录")
+            return AuthStatus(
+                "missing",
+                "sidecar 已连接但尚未登录：扫码后运行 python main.py source sync-cookie",
+            )
         return self.session.auth_status()
 
     def authenticate(self, *, headful: bool) -> None:

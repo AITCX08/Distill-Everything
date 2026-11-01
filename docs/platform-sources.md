@@ -100,6 +100,9 @@ python main.py source sync-cookie           # 把浏览器 cookie 写进 sidecar
 
 没有 `sessionid` 时 `sync-cookie` 会直接报错，不会写入半截 cookie。
 
+> 状态判定：`sidecar 可达` **不等于** `已登录`。平台卡片的「已登录」只在 sidecar 配置里
+> 存在真实 `sessionid` 时才成立；仅端口通会显示「sidecar 已连接但尚未登录」。
+
 `auto` 语义：探活 `GET /openapi.json` 成功 → sidecar；否则 browser。**不需要 Docker**：sidecar 是普通 Python 应用，可用独立 venv 或 WSL2 运行；本机已有 Chrome/Edge 时，浏览器模式无需下载 Playwright Chromium（`launch_persistent_context` 会按 `bundled → chrome → msedge` 顺序回退）。
 
 #### 本机运行（无 Docker，已验证）

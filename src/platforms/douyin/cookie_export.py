@@ -64,3 +64,18 @@ def sync(session: Any, sidecar_dir: Path | None = None) -> tuple[Path, int]:
     header = read_browser_cookie(session)
     write_cookie(config_path, header)
     return config_path, header.count("=")
+
+
+def has_sidecar_cookie(sidecar_dir: Path | None = None) -> bool:
+    """True when the sidecar config carries a real session cookie."""
+
+    root = Path(sidecar_dir) if sidecar_dir else DEFAULT_SIDECAR_DIR
+    config_path = root / DOUYIN_CONFIG
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    match = COOKIE_LINE_RE.search(text)
+    if not match:
+        return False
+    return "sessionid=" in match.group(0)
