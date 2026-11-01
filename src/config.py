@@ -125,6 +125,7 @@ class AppConfig(BaseModel):
     funasr: FunASRConfig = Field(default_factory=FunASRConfig)
     feishu: FeishuConfig = Field(default_factory=FeishuConfig)
     xhs: XhsConfig = Field(default_factory=XhsConfig)
+    insights_enabled: bool = Field(default=False, description="创作者中心采集开关")
     douyin: DouyinConfig = Field(default_factory=DouyinConfig)
     distillation: DistillationConfig = Field(default_factory=DistillationConfig)
 
@@ -230,6 +231,7 @@ def load_config() -> AppConfig:
             sidecar_url=os.getenv("DOUYIN_SIDECAR_URL", "http://127.0.0.1:8000"),
             sidecar_timeout=float(os.getenv("DOUYIN_SIDECAR_TIMEOUT", "30")),
         ),
+        insights_enabled=os.getenv("INSIGHTS_ENABLED", "0").lower() in {"1", "true", "yes"},
         xhs=XhsConfig(
             source=os.getenv("XHS_SOURCE", "sidecar").strip().lower() or "sidecar",
             sidecar_url=os.getenv("XHS_SIDECAR_URL", "http://127.0.0.1:8001"),

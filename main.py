@@ -312,6 +312,42 @@ def dashboard(port: int, open_browser: bool):
     run_dashboard(build_dashboard_service(load_config()), port=port, open_browser=open_browser)
 
 
+def _insights_profile(config, platform: str):
+    if platform == "douyin":
+        return config.douyin.profile_dir
+    return config.data_dir / "browser" / platform
+
+
+@cli.command("insights")
+@click.option(
+    "--platform",
+    type=click.Choice(["bilibili", "douyin", "xiaohongshu"]),
+    required=True,
+)
+@click.option("--json", "json_path", type=click.Path(dir_okay=False), default=None)
+def insights_cmd(platform: str, json_path: str | None):
+    """读取创作者中心自有数据（需先在该平台的持久 profile 里登录）。"""
+
+    import json as _json
+    from pathlib import Path
+
+    from src.config import load_config
+    from src.platforms.insights.core import InsightsBrowserSession, capture
+    from src.platforms.insights.providers import SPECS
+
+    config = load_config()
+    if not config.insights_enabled:
+        raise click.ClickException("创作者中心采集未启用：设置 INSIGHTS_ENABLED=1 后重试")
+
+    snapshot = capture(InsightsBrowserSession(_insights_profile(config, platform)), SPECS[platform])
+    payload = _json.dumps(snapshot.to_dict(), ensure_ascii=False, indent=2)
+    if json_path:
+        Path(json_path).write_text(payload, encoding="utf-8")
+        console.print(f"[green]已写入[/green] {json_path}")
+        return
+    click.echo(payload)
+
+
 @cli.command("mcp")
 @click.option(
     "--transport",

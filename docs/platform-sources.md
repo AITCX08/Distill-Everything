@@ -121,6 +121,21 @@ GET /xhs/user/collect?user_id=&cursor= → 同上
 打开已登录的持久 profile → 落到后台首页 → 拦截目标 XHR → 归一化为 InsightsSnapshot
 ```
 
+实现落点：
+
+| 平台 | 页面 | 拦截标记（可扩充） | 归一化函数 |
+| --- | --- | --- | --- |
+| Bilibili | `member.bilibili.com/platform/home` | `/x/web/data/`、`/x/web/archive/`、`member.bilibili.com/x/` | `normalize_bilibili` |
+| 抖音 | `creator.douyin.com/creator-micro/home` | `/aweme/v1/creator/`、`/creator/data/` | `normalize_douyin` |
+| 小红书 | `creator.xiaohongshu.com/creator/home` | `creator.xiaohongshu.com/api/`、`/api/galaxy/` | `normalize_xiaohongshu` |
+
+入口：`INSIGHTS_ENABLED=1 python main.py insights --platform bilibili [--json out.json]`。
+默认关闭；关闭时命令直接报错，不会启动浏览器。profile 复用各平台登录目录
+（抖音用 `DOUYIN_PROFILE_DIR`，其余用 `data/browser/<platform>`）。
+
+> 标记与字段名来自各平台后台的公开路由，**真机校准后**把结果追加到 §9 验证记录；
+> 未命中的平台会明确报 `InsightsUnavailable`，不会产出半截数据。
+
 `InsightsSnapshot` 契约：
 
 ```json
@@ -158,7 +173,7 @@ GET /xhs/user/collect?user_id=&cursor= → 同上
 | `XHS_SOURCE` | `sidecar` | ✅ 已实现 | `sidecar` / `off` |
 | `XHS_SIDECAR_URL` | `http://127.0.0.1:8001` | ✅ 已实现 | 小红书 sidecar 地址 |
 | `XHS_SIDECAR_TIMEOUT` | `30` | ✅ 已实现 | 小红书 sidecar 超时（秒） |
-| `INSIGHTS_ENABLED` | `0` | ⏳ 计划 | 创作者中心采集开关（默认关，避免误触后台） |
+| `INSIGHTS_ENABLED` | `0` | ✅ 已实现 | 创作者中心采集开关（默认关，避免误触后台） |
 
 ## 6. 里程碑与验收
 
@@ -167,7 +182,7 @@ GET /xhs/user/collect?user_id=&cursor= → 同上
 | **M1** | B 站收藏夹（自研 3 GET） | 离线 fixture 单测；对公开收藏夹真实拉取 ≥1 页；失效条目被过滤 |
 | M2 | 抖音 sidecar（收藏夹/合集） | 假 sidecar 服务单测；`auto` 探测与降级各一条用例；真实抽检 |
 | M3 | 小红书分享链接 + 收藏夹 | 短链解析单测；签名层 smoke |
-| M4 | 创作者中心（三平台） | 拦截契约单测；`INSIGHTS_ENABLED=0` 时不发请求 |
+| **M4** | 创作者中心（三平台） | ✅ 拦截契约单测 + CLI 开关用例；`INSIGHTS_ENABLED=0` 时不启动浏览器 |
 
 **完成定义**：`ruff` 通过、全量 pytest 通过、CI 三平台绿、至少一条真实链路抽检记录写进本文档「验证记录」。
 
@@ -192,4 +207,6 @@ GET /xhs/user/collect?user_id=&cursor= → 同上
 | --- | --- | --- | --- | --- |
 | 2026-10-31 | Bilibili | 收藏夹枚举 | 公开收藏夹 307 条，过滤失效后 247 条，`complete=True` | `python main.py source creator "bilibili:fav:63692673" --dry-run` |
 | 2026-10-31 | 抖音 | sidecar 路由 | 单元级：posts / collection / mix 三条路径与浏览器回退各有用例 | `tests/platforms/douyin/test_sidecar.py` |
+| 2026-10-31 | 小红书 | 目标解析与采集契约 | 单元级：短链/笔记/用户/收藏 21 例；真实链路待 sidecar 启动 | `tests/platforms/xhs/` |
+| 2026-10-31 | 三平台 | 创作者中心 | 单元级：归一化 + 拦截 + 开关 6 例；真机校准待补 | `tests/platforms/test_insights.py` |
 

@@ -6,6 +6,9 @@
 
 ### 新增
 
+- **创作者中心采集（Insights）**：`python main.py insights --platform bilibili|douyin|xiaohongshu`
+  用已登录的持久 profile 打开后台并拦截 XHR，归一化为 `InsightsSnapshot`（缺失指标保持 `null`，
+  不会误记成 0）；默认关闭，需 `INSIGHTS_ENABLED=1`。
 - **小红书平台支持**：新增 `src/platforms/xhs/`，支持笔记链接（含 `xhslink.com` 短链）、
   用户主页、收藏（`xhs:collect:<user_id>`）与图文/视频下载；走 Spider_XHS 风格的
   sidecar 契约（`/xhs/note`、`/xhs/user/notes`、`/xhs/user/collect`），路径可覆盖。
