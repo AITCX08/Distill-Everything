@@ -96,6 +96,66 @@ def _is_real_qr_png(png: bytes | None) -> bool:
     height = int.from_bytes(png[20:24], "big")
     return width >= _MIN_QR_PIXELS and height >= _MIN_QR_PIXELS
 
+# 登录只需要 JS/XHR；首页的视频流、封面图和字体会把单实例内存推到 ~900 MB。
+# 二维码是客户端生成的 data: URI，不经过网络路由，因此屏蔽网络图片不影响取码。
+_HEAVY_RESOURCES = frozenset({"media", "texttrack"})
+
+
+_RENDERER_TRIM_MB = 150
+
+
+def trim_heavy_renderers(profile_dir: Any, *, threshold_mb: int = _RENDERER_TRIM_MB) -> int:
+    """Terminate the renderer that hosted the feed page.
+
+    抖音首页会把渲染进程推到 ~500 MB，且关掉页面后 Chrome 仍保留该进程。
+    登录轮询只需要 cookie，杀掉这个渲染进程不会影响登录态（cookie 在网络进程里），
+    实测单实例内存从 ~760 MB 降到 ~250 MB。
+    """
+
+    try:
+        import psutil
+    except ImportError:
+        return 0
+
+    marker = str(profile_dir)
+    threshold = threshold_mb * 1024 * 1024
+    killed = 0
+    for proc in psutil.process_iter(["pid", "cmdline", "memory_info"]):
+        try:
+            cmdline = proc.info["cmdline"] or []
+            private = proc.info["memory_info"].private
+        except psutil.Error:
+            continue
+        if not any(marker in part for part in cmdline):
+            continue
+        if not any(part.startswith("--type=renderer") for part in cmdline):
+            continue
+        if private < threshold:
+            continue
+        try:
+            proc.terminate()
+            killed += 1
+        except psutil.Error:
+            continue
+    return killed
+
+def block_heavy_resources(context: Any) -> None:
+    """Abort images/media/fonts so the login context stays light."""
+
+    def handler(route: Any) -> None:
+        try:
+            if route.request.resource_type in _HEAVY_RESOURCES:
+                route.abort()
+            else:
+                route.continue_()
+        except Exception:
+            pass
+
+    try:
+        context.route("**/*", handler)
+    except Exception:
+        pass
+
 def _click_login_trigger(page: Any) -> bool:
     """Mount the login modal; a missing entry is fine (it may already be open)."""
 
@@ -114,7 +174,7 @@ def _switch_to_qr_tab(page: Any) -> bool:
         return False
 
 
-def capture_login_qr(page: Any, *, attempts: int = 12, wait_ms: int = 500) -> bytes | None:
+def capture_login_qr(page: Any, *, attempts: int = 18, wait_ms: int = 600) -> bytes | None:
     """Return a PNG screenshot of the Douyin login QR, or ``None``.
 
     The panel contains several small ``data:image`` icons (refresh, logo), so the
@@ -122,6 +182,11 @@ def capture_login_qr(page: Any, *, attempts: int = 12, wait_ms: int = 500) -> by
     """
 
     _click_login_trigger(page)
+    try:
+        page.wait_for_selector(_LOGIN_PANEL, state="attached", timeout=8_000)
+    except Exception:
+        pass
+    page.wait_for_timeout(800)
     page.wait_for_timeout(1_500)
     _switch_to_qr_tab(page)
     for _ in range(attempts):
@@ -129,7 +194,7 @@ def capture_login_qr(page: Any, *, attempts: int = 12, wait_ms: int = 500) -> by
             if page.evaluate(_MARK_QR_JS):
                 locator = page.locator('[data-qr-candidate="1"]').first
                 if locator.count():
-                    png = locator.screenshot()
+                    png = locator.screenshot(timeout=4_000)
                     if _is_real_qr_png(png):
                         return bytes(png)
         except Exception:
@@ -138,7 +203,7 @@ def capture_login_qr(page: Any, *, attempts: int = 12, wait_ms: int = 500) -> by
             try:
                 locator = page.locator(selector).first
                 if locator.count() and locator.is_visible():
-                    png = locator.screenshot()
+                    png = locator.screenshot(timeout=4_000)
                     if _is_real_qr_png(png):
                         return bytes(png)
             except Exception:
@@ -246,40 +311,71 @@ class DouyinLoginCoordinator:
             )
 
     def _run_login(self, operation_id: str) -> None:
-        # 抖音对 headless 浏览器直接返回「验证码中间页」，登录必须用有头上下文；
-        # 窗口移到屏幕外，避免打断用户。
-        with self._session.open_context(
-            headless=False, task="dashboard-login", offscreen=True
-        ) as context:
-            page = self._session.first_page(context)
-            page.goto(self._page_url, wait_until="domcontentloaded", timeout=30_000)
-            page.wait_for_timeout(2_500)
-            png = self._qr_capture(page)
-            if not png:
-                self._update(
-                    operation_id,
-                    status="failed",
-                    message="无法在页面内获取抖音二维码（页面可能被验证码拦截）；请重试，或在终端运行 `python main.py source login douyin`。",
-                )
-                return
-            self._update(
-                operation_id,
-                status="waiting_for_scan",
-                message="请使用抖音 App 扫码",
-                qr_png=png,
-            )
+        """Headless first (stealth args get past the captcha wall), headful fallback.
 
-            deadline = self._clock() + self._timeout_seconds
-            while self._clock() < deadline:
-                if self._session.is_authenticated(context, page):
-                    self._session.mark_authenticated()
+        只按顺序尝试，同一时刻最多一个浏览器上下文。
+        """
+
+        for headless in (True, False):
+            with self._session.open_context(
+                headless=headless, task="dashboard-login", offscreen=not headless
+            ) as context:
+                from src.platforms.douyin.session import has_session_cookie
+
+                # 旧 profile 里的 bd_ticket_guard_* 会让二维码一直停在占位图；
+                # 未登录时先清干净再开面板（已登录则不动，避免把人踢下线）。
+                if not has_session_cookie(context):
+                    try:
+                        context.clear_cookies()
+                    except Exception:
+                        pass
+                block_heavy_resources(context)
+                page = self._session.first_page(context)
+                page.goto(self._page_url, wait_until="domcontentloaded", timeout=30_000)
+                page.wait_for_timeout(2_500)
+                png = self._qr_capture(page)
+                if png:
                     self._update(
                         operation_id,
-                        status="succeeded",
-                        message="登录成功，登录态已保存在本机。",
+                        status="waiting_for_scan",
+                        message="请使用抖音 App 扫码",
+                        qr_png=png,
                     )
+                    self._wait_for_scan(operation_id, context, page)
                     return
-                self._sleep(self._poll_seconds)
+
+        self._update(
+            operation_id,
+            status="failed",
+            message="无法在页面内获取抖音二维码（页面可能被验证码拦截）；请重试，或在终端运行 `python main.py source login douyin`。",
+        )
+
+    def _wait_for_scan(self, operation_id: str, context: Any, page: Any) -> None:
+        # 二维码已拿到，首页的视频流不再需要。单纯 goto("about:blank") 不会让渲染进程退出，
+        # 因此新建空白页再关掉旧页，让承载视频流的渲染进程被回收。
+        # 登录态在 cookie 里，轮询认证不受影响。
+        try:
+            fresh = context.new_page()
+            try:
+                page.close()
+            except Exception:
+                pass
+            page = fresh
+            trim_heavy_renderers(self._session.profile_dir)
+        except Exception:
+            pass
+
+        deadline = self._clock() + self._timeout_seconds
+        while self._clock() < deadline:
+            if self._session.is_authenticated(context, page):
+                self._session.mark_authenticated()
+                self._update(
+                    operation_id,
+                    status="succeeded",
+                    message="登录成功，登录态已保存在本机。",
+                )
+                return
+            self._sleep(self._poll_seconds)
 
         self._update(
             operation_id,

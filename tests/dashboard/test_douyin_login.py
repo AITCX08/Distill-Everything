@@ -56,7 +56,7 @@ def _wait_until(coordinator, operation_id, predicate, *, timeout=3.0):
     return snapshot
 
 
-def test_login_runs_headful_offscreen_and_serves_the_qr_png():
+def test_login_runs_headless_and_serves_the_qr_png():
     session = FakeSession(authenticated_after=10**6)
     coordinator = DouyinLoginCoordinator(
         session,
@@ -71,7 +71,7 @@ def test_login_runs_headful_offscreen_and_serves_the_qr_png():
     assert snapshot.status == "waiting_for_scan"
     assert coordinator.qr_png(started.operation_id) == b"PNG-BYTES"
     # 抖音对 headless 直接返回验证码页，登录必须有头（窗口移到屏幕外）\n    assert session.headless_flags == [False]
-    assert session.page.urls == ["https://www.douyin.com/"]
+    # 抓完码后页面切到 about:blank 释放内存\n    assert session.page.urls == ["https://www.douyin.com/", "about:blank"]
     coordinator._update(started.operation_id, status="cancelled", message="test cleanup")
 
 
@@ -136,7 +136,7 @@ class _FakeLocator:
     def is_visible(self):
         return self._visible
 
-    def screenshot(self):
+    def screenshot(self, **_kwargs):
         return self._png
 
 
@@ -153,6 +153,9 @@ class _FakePage:
         return True
 
     def wait_for_timeout(self, _ms):
+        return None
+
+    def wait_for_selector(self, _selector, **_kwargs):
         return None
 
     def locator(self, selector):
@@ -176,3 +179,74 @@ def test_capture_returns_none_when_no_qr_shows_up():
     page = _FakePage(mark=False)
 
     assert capture_login_qr(page, attempts=2, wait_ms=0) is None
+
+
+def test_login_falls_back_to_headful_when_headless_capture_fails():
+    session = FakeSession(authenticated_after=10**6)
+    calls = {"count": 0}
+
+    def flaky_capture(_page):
+        calls["count"] += 1
+        return None if calls["count"] == 1 else b"PNG-FALLBACK"
+
+    coordinator = DouyinLoginCoordinator(
+        session,
+        qr_capture=flaky_capture,
+        poll_seconds=0.01,
+        timeout_seconds=5,
+    )
+
+    started = coordinator.start()
+    snapshot = _wait_until(coordinator, started.operation_id, lambda item: item.status == "waiting_for_scan")
+
+    assert snapshot.status == "waiting_for_scan"
+    assert coordinator.qr_png(started.operation_id) == b"PNG-FALLBACK"
+    assert session.headless_flags == [True, False]
+    coordinator._update(started.operation_id, status="cancelled", message="test cleanup")
+
+class _FakeProc:
+    def __init__(self, cmdline, private_mb, *, fail=False):
+        self.info = {
+            "pid": 1,
+            "cmdline": cmdline,
+            "memory_info": type("Mem", (), {"private": private_mb * 1024 * 1024})(),
+        }
+        self._fail = fail
+        self.terminated = False
+
+    def terminate(self):
+        if self._fail:
+            import psutil
+
+            raise psutil.Error()
+        self.terminated = True
+
+
+def test_trim_heavy_renderers_kills_only_matching_heavy_processes(monkeypatch):
+    import psutil
+
+    from src.dashboard.douyin_login import trim_heavy_renderers
+
+    profile = "C:/profiles/douyin"
+    heavy = _FakeProc([f"--user-data-dir={profile}", "--type=renderer"], 500)
+    light = _FakeProc([f"--user-data-dir={profile}", "--type=renderer"], 40)
+    other = _FakeProc(["--user-data-dir=C:/profiles/other", "--type=renderer"], 900)
+    browser = _FakeProc([f"--user-data-dir={profile}"], 90)
+    monkeypatch.setattr(psutil, "process_iter", lambda _fields: [heavy, light, other, browser])
+
+    assert trim_heavy_renderers(profile) == 1
+    assert heavy.terminated is True
+    assert light.terminated is False
+    assert other.terminated is False
+    assert browser.terminated is False
+
+
+def test_trim_heavy_renderers_survives_psutil_errors(monkeypatch):
+    import psutil
+
+    from src.dashboard.douyin_login import trim_heavy_renderers
+
+    failing = _FakeProc(["--user-data-dir=C:/p", "--type=renderer"], 400, fail=True)
+    monkeypatch.setattr(psutil, "process_iter", lambda _fields: [failing])
+
+    assert trim_heavy_renderers("C:/p") == 0

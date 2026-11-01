@@ -115,3 +115,49 @@ def test_launch_reports_a_clear_error_when_nothing_is_available(tmp_path):
         assert "playwright install chromium" in str(error)
     else:
         raise AssertionError("expected PlatformDependencyError")
+
+
+class _CookieContext:
+    def __init__(self, cookies):
+        self._cookies = cookies
+
+    def cookies(self, *_args):
+        return self._cookies
+
+
+class _WallPage:
+    def __init__(self, *, url, wall=False):
+        self.url = url
+        self._wall = wall
+
+    def evaluate(self, _script):
+        return self._wall
+
+
+def test_passport_csrf_token_alone_is_not_a_login():
+    """打开登录面板就会写 passport_csrf_token，匿名态不能被当成已登录。"""
+
+    from src.platforms.douyin.session import _context_authenticated
+
+    context = _CookieContext([{"name": "passport_csrf_token", "value": "x"}])
+
+    assert _context_authenticated(context, _WallPage(url="https://www.douyin.com/")) is False
+
+
+def test_session_cookie_wins_on_a_blanked_page():
+    """抓完码切到 about:blank 后，登录墙检查不可用，会话 cookie 即判据。"""
+
+    from src.platforms.douyin.session import _context_authenticated
+
+    context = _CookieContext([{"name": "sessionid", "value": "abc"}])
+
+    assert _context_authenticated(context, _WallPage(url="about:blank")) is True
+
+
+def test_session_cookie_with_a_visible_login_wall_is_not_authenticated():
+    from src.platforms.douyin.session import _context_authenticated
+
+    context = _CookieContext([{"name": "sessionid", "value": "abc"}])
+    page = _WallPage(url="https://www.douyin.com/", wall=True)
+
+    assert _context_authenticated(context, page) is False

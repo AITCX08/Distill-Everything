@@ -18,7 +18,9 @@ from src.platforms.errors import (
 from src.platforms.models import AuthStatus
 
 
-_LOGIN_COOKIES = {"sessionid", "sessionid_ss", "sid_guard", "passport_csrf_token"}
+# 只有真正的会话 cookie 才算登录成功。passport_csrf_token 在**打开登录面板**时就会写入，
+# 不能作为登录依据（否则匿名态会被误判为已登录）。
+_LOGIN_COOKIES = {"sessionid", "sessionid_ss", "sid_guard"}
 _LOGIN_WALL_CHECK = r"""() => {
     const text = (document.body && document.body.innerText || '').replace(/\s+/g, ' ');
     if (text.includes('登录后即可观看喜欢、收藏的视频')) return true;
@@ -34,7 +36,32 @@ _LOGIN_WALL_CHECK = r"""() => {
 
 
 _CHANNELS = ("chrome", "msedge")
-_LAUNCH_ARGS = ("--disable-blink-features=AutomationControlled",)
+_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+# 一组固定的轻量参数：
+# - AutomationControlled / UA / lang：绕过抖音对 headless 的识别，
+#   否则首页直接返回「验证码中间页」，DOM 里没有登录入口
+# - 资源类：关 GPU / 扩展 / 后台网络，限制渲染进程与 V8 堆，避免多实例吃内存
+_LAUNCH_ARGS = (
+    "--disable-blink-features=AutomationControlled",
+    "--disable-features=IsolateOrigins,site-per-process,BackForwardCache,CalculateNativeWinOcclusion",
+    "--lang=zh-CN",
+    f"--user-agent={_UA}",
+    "--disable-gpu",
+    "--disable-gpu-compositing",
+    "--disable-software-rasterizer",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-sync",
+    "--mute-audio",
+    "--no-first-run",
+    "--renderer-process-limit=1",
+    "--js-flags=--max-old-space-size=256",
+    "--autoplay-policy=user-gesture-required",
+)
 
 
 def launch_persistent_context(
@@ -104,6 +131,18 @@ def _first_page(context: Any) -> Any:
     return pages[0] if pages else context.new_page()
 
 
+def has_session_cookie(context: Any) -> bool:
+    """True only when a real session cookie exists (not just passport_csrf_token)."""
+
+    try:
+        return any(
+            cookie.get("name") in _LOGIN_COOKIES and cookie.get("value")
+            for cookie in context.cookies()
+        )
+    except Exception:
+        return False
+
+
 def _context_authenticated(context: Any, page: Any) -> bool:
     explicit = getattr(context, "authenticated", None)
     if explicit is not None:
@@ -117,6 +156,14 @@ def _context_authenticated(context: Any, page: Any) -> bool:
         return False
     if not has_cookie:
         return False
+    # 抓完二维码后页面会被切到 about:blank 释放内存，此时登录墙检查没有意义，
+    # 会话 cookie 本身就是登录成功的判据。
+    try:
+        url = str(getattr(page, "url", "") or "")
+    except Exception:
+        url = ""
+    if url in ("", "about:blank"):
+        return True
     try:
         return not bool(page.evaluate(_LOGIN_WALL_CHECK))
     except Exception:

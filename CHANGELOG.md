@@ -30,6 +30,10 @@
 
 ### 修复
 
+- 抖音页内扫码改为 **headless + 反检测参数**（`AutomationControlled`/UA/lang），不再弹窗；
+  抓码后关闭重页面并终止其渲染进程，等待扫码时内存从 ~1 GB 降到 ~200 MB；
+  登录判定只认 `sessionid/sessionid_ss/sid_guard`，避免 `passport_csrf_token` 造成匿名误判。
+
 - 抖音页内扫码登录：headless 会被「验证码中间页」拦截，改为有头 + 窗口移出屏幕；
   自动切换到「扫码登录」页签；按面积挑选二维码并校验 PNG 尺寸，避免抓到 22×22 图标。
 
@@ -45,6 +49,10 @@
 - 抖音认证提示改为中文页内引导，不再提示“在外部浏览器登录”。
 
 ### 修复
+
+- 抖音页内扫码改为 **headless + 反检测参数**（`AutomationControlled`/UA/lang），不再弹窗；
+  抓码后关闭重页面并终止其渲染进程，等待扫码时内存从 ~1 GB 降到 ~200 MB；
+  登录判定只认 `sessionid/sessionid_ss/sid_guard`，避免 `passport_csrf_token` 造成匿名误判。
 
 - CLI 不再把 `auth_status="not_required"` 当成认证失败：此前 YouTube 会在预检阶段直接报
   “YouTube 公开内容无需登录”并退出。
@@ -64,6 +72,10 @@
 
 ### 修复
 
+- 抖音页内扫码改为 **headless + 反检测参数**（`AutomationControlled`/UA/lang），不再弹窗；
+  抓码后关闭重页面并终止其渲染进程，等待扫码时内存从 ~1 GB 降到 ~200 MB；
+  登录判定只认 `sessionid/sessionid_ss/sid_guard`，避免 `passport_csrf_token` 造成匿名误判。
+
 - 抖音页内扫码登录：headless 会被「验证码中间页」拦截，改为有头 + 窗口移出屏幕；
   自动切换到「扫码登录」页签；按面积挑选二维码并校验 PNG 尺寸，避免抓到 22×22 图标。
 
@@ -80,6 +92,10 @@
 - `src.outputs` / `src.platforms` / `src.distillation` 改为 PEP 562 惰性导出，导入任一层不再触发整包加载。
 
 ### 修复
+
+- 抖音页内扫码改为 **headless + 反检测参数**（`AutomationControlled`/UA/lang），不再弹窗；
+  抓码后关闭重页面并终止其渲染进程，等待扫码时内存从 ~1 GB 降到 ~200 MB；
+  登录判定只认 `sessionid/sessionid_ss/sid_guard`，避免 `passport_csrf_token` 造成匿名误判。
 
 - 修复循环导入：`import src.outputs` 或单独运行 `pytest tests/outputs` 会抛 `ImportError: cannot import name 'ArtifactKind' from partially initialized module`。
 - 修复任务初始化崩溃：`SourceCreator.raw_metadata`（`MappingProxyType`）参与 `dataclasses.asdict` 导致 `TypeError: cannot pickle 'mappingproxy' object`；现在 `job_state.json` 只持久化公开身份字段。
