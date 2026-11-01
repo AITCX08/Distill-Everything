@@ -101,44 +101,6 @@ def _is_real_qr_png(png: bytes | None) -> bool:
 _HEAVY_RESOURCES = frozenset({"media", "texttrack"})
 
 
-_RENDERER_TRIM_MB = 150
-
-
-def trim_heavy_renderers(profile_dir: Any, *, threshold_mb: int = _RENDERER_TRIM_MB) -> int:
-    """Terminate the renderer that hosted the feed page.
-
-    抖音首页会把渲染进程推到 ~500 MB，且关掉页面后 Chrome 仍保留该进程。
-    登录轮询只需要 cookie，杀掉这个渲染进程不会影响登录态（cookie 在网络进程里），
-    实测单实例内存从 ~760 MB 降到 ~250 MB。
-    """
-
-    try:
-        import psutil
-    except ImportError:
-        return 0
-
-    marker = str(profile_dir)
-    threshold = threshold_mb * 1024 * 1024
-    killed = 0
-    for proc in psutil.process_iter(["pid", "cmdline", "memory_info"]):
-        try:
-            cmdline = proc.info["cmdline"] or []
-            private = proc.info["memory_info"].private
-        except psutil.Error:
-            continue
-        if not any(marker in part for part in cmdline):
-            continue
-        if not any(part.startswith("--type=renderer") for part in cmdline):
-            continue
-        if private < threshold:
-            continue
-        try:
-            proc.terminate()
-            killed += 1
-        except psutil.Error:
-            continue
-    return killed
-
 def block_heavy_resources(context: Any) -> None:
     """Abort images/media/fonts so the login context stays light."""
 
@@ -363,20 +325,9 @@ class DouyinLoginCoordinator:
         )
 
     def _wait_for_scan(self, operation_id: str, context: Any, page: Any) -> None:
-        # 二维码已拿到，首页的视频流不再需要。单纯 goto("about:blank") 不会让渲染进程退出，
-        # 因此新建空白页再关掉旧页，让承载视频流的渲染进程被回收。
-        # 登录态在 cookie 里，轮询认证不受影响。
-        try:
-            fresh = context.new_page()
-            try:
-                page.close()
-            except Exception:
-                pass
-            page = fresh
-            trim_heavy_renderers(self._session.profile_dir)
-        except Exception:
-            pass
-
+        # 注意：**不能**在这里关页面。二维码是页面里的长轮询，扫码确认的回包要靠它
+        # 落到浏览器里；关掉页面就再也收不到登录态，状态会永远停在「等待扫码」。
+        # 代价是等待期间保留首页（约 700 MB），登录结束浏览器即退出。
         deadline = self._clock() + self._timeout_seconds
         while self._clock() < deadline:
             if self._session.is_authenticated(context, page):
