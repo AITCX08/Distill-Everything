@@ -28,6 +28,11 @@
 - 抖音 **Dashboard 页内扫码登录**：`DouyinLoginCoordinator` 用无头持久上下文截取登录二维码，
   经本地接口提供给弹窗；拿不到二维码时回退提示 CLI 的外部浏览器流程。
 
+### 修复
+
+- 抖音页内扫码登录：headless 会被「验证码中间页」拦截，改为有头 + 窗口移出屏幕；
+  自动切换到「扫码登录」页签；按面积挑选二维码并校验 PNG 尺寸，避免抓到 22×22 图标。
+
 ### 变更
 
 - 新增 `python main.py source sync-cookie`：把浏览器扫码得到的抖音登录态写入 sidecar 的
@@ -56,6 +61,11 @@
 - 本地 Dashboard：展示脱敏状态、真实阶段、任务队列、产物预览和平台登录入口。
 - Linux、Windows、macOS 基础 Python CI 与 Node 24 Dashboard CI，另加 Ruff 与 CodeQL 静态检查。
 - Windows 与 macOS 的安装、启动、排障及安全边界文档。
+
+### 修复
+
+- 抖音页内扫码登录：headless 会被「验证码中间页」拦截，改为有头 + 窗口移出屏幕；
+  自动切换到「扫码登录」页签；按面积挑选二维码并校验 PNG 尺寸，避免抓到 22×22 图标。
 
 ### 变更
 

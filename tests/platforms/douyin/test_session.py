@@ -18,8 +18,8 @@ class FakeContext:
 
 def browser_factory(authenticated: bool, calls: list[dict]):
     @contextmanager
-    def factory(profile_dir, *, headless):
-        calls.append({"profile_dir": profile_dir, "headless": headless})
+    def factory(profile_dir, *, headless, extra_args=()):
+        calls.append({"profile_dir": profile_dir, "headless": headless, "extra_args": extra_args})
         yield FakeContext(authenticated)
 
     return factory

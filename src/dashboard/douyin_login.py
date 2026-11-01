@@ -13,20 +13,56 @@ from threading import Lock, Thread
 from typing import Any, Callable
 from uuid import uuid4
 
-_LOGIN_TRIGGER_SELECTORS = (
-    '[data-e2e="login-button"]',
-    '[data-e2e="login"] button',
-    'button:has-text("登录")',
-    '[role="button"]:has-text("登录")',
-)
+_LOGIN_PANEL = "#douyin_login_comp_flat_panel"
 _QR_SELECTORS = (
+    f'{_LOGIN_PANEL} img[src^="data:image"]',
     '[data-e2e="login-qrcode"] img',
-    '[class*="qrcode"] img',
-    '[class*="login"] canvas',
+    'img[src^="data:image/png;base64"]',
     '[class*="qrcode"] canvas',
-    'img[src^="data:image"]',
-    'canvas',
 )
+
+# 抖音首页默认把「登录」放在顶部导航里，且文字节点没有稳定选择器；
+# 用 JS 按文本精确匹配比 button:has-text 稳（后者会先命中隐藏节点）。
+_CLICK_LOGIN_JS = """() => {
+  const nodes = [...document.querySelectorAll('*')].filter(
+    (el) => (el.textContent || '').trim() === '登录' && el.children.length === 0
+  );
+  const visible = nodes.find((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  if (!visible) return false;
+  (visible.closest('button, [role=button], div') || visible).click();
+  return true;
+}"""
+
+_MARK_QR_JS = """() => {
+  const panel = document.querySelector('%s') || document;
+  const images = [...panel.querySelectorAll('img')].filter((el) =>
+    String(el.getAttribute('src') || '').startsWith('data:image')
+  );
+  let best = null;
+  for (const el of images) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 120) continue;
+    const area = rect.width * rect.height;
+    if (!best || area > best.area) best = {el, area};
+  }
+  if (!best) return false;
+  best.el.setAttribute('data-qr-candidate', '1');
+  return true;
+}""" % _LOGIN_PANEL
+_SWITCH_TO_QR_JS = """() => {
+  const panel = document.querySelector('%s');
+  if (!panel) return false;
+  const target = [...panel.querySelectorAll('*')].find((el) => {
+    const text = (el.textContent || '').trim();
+    return /扫码登录/.test(text) && text.length < 8;
+  });
+  if (!target) return false;
+  target.click();
+  return true;
+}""" % _LOGIN_PANEL
 
 
 @dataclass(frozen=True)
@@ -47,30 +83,63 @@ class _LoginOperation:
         return DouyinLoginSnapshot(self.operation_id, self.status, self.message)
 
 
-def _click_login_trigger(page: Any) -> None:
-    """Mount the login modal; a missing button is fine (page may already show it)."""
-
-    for selector in _LOGIN_TRIGGER_SELECTORS:
-        try:
-            locator = page.locator(selector).first
-            if locator.count() and locator.is_visible():
-                locator.click(timeout=3_000)
-                return
-        except Exception:
-            continue
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_MIN_QR_PIXELS = 100
 
 
-def capture_login_qr(page: Any, *, attempts: int = 10, wait_ms: int = 500) -> bytes | None:
-    """Return a PNG screenshot of the Douyin login QR, or ``None``."""
+def _is_real_qr_png(png: bytes | None) -> bool:
+    """Reject the small icons that also use ``data:image`` sources."""
+
+    if not png or len(png) < 24 or not png.startswith(_PNG_SIGNATURE):
+        return False
+    width = int.from_bytes(png[16:20], "big")
+    height = int.from_bytes(png[20:24], "big")
+    return width >= _MIN_QR_PIXELS and height >= _MIN_QR_PIXELS
+
+def _click_login_trigger(page: Any) -> bool:
+    """Mount the login modal; a missing entry is fine (it may already be open)."""
+
+    try:
+        return bool(page.evaluate(_CLICK_LOGIN_JS))
+    except Exception:
+        return False
+
+
+def _switch_to_qr_tab(page: Any) -> bool:
+    """Douyin opens on the phone-login panel; the QR lives behind a tab."""
+
+    try:
+        return bool(page.evaluate(_SWITCH_TO_QR_JS))
+    except Exception:
+        return False
+
+
+def capture_login_qr(page: Any, *, attempts: int = 12, wait_ms: int = 500) -> bytes | None:
+    """Return a PNG screenshot of the Douyin login QR, or ``None``.
+
+    The panel contains several small ``data:image`` icons (refresh, logo), so the
+    largest qualifying image is marked first instead of taking the first match.
+    """
 
     _click_login_trigger(page)
+    page.wait_for_timeout(1_500)
+    _switch_to_qr_tab(page)
     for _ in range(attempts):
+        try:
+            if page.evaluate(_MARK_QR_JS):
+                locator = page.locator('[data-qr-candidate="1"]').first
+                if locator.count():
+                    png = locator.screenshot()
+                    if _is_real_qr_png(png):
+                        return bytes(png)
+        except Exception:
+            pass
         for selector in _QR_SELECTORS:
             try:
                 locator = page.locator(selector).first
                 if locator.count() and locator.is_visible():
                     png = locator.screenshot()
-                    if png:
+                    if _is_real_qr_png(png):
                         return bytes(png)
             except Exception:
                 continue
@@ -177,15 +246,20 @@ class DouyinLoginCoordinator:
             )
 
     def _run_login(self, operation_id: str) -> None:
-        with self._session.open_context(headless=True, task="dashboard-login") as context:
+        # 抖音对 headless 浏览器直接返回「验证码中间页」，登录必须用有头上下文；
+        # 窗口移到屏幕外，避免打断用户。
+        with self._session.open_context(
+            headless=False, task="dashboard-login", offscreen=True
+        ) as context:
             page = self._session.first_page(context)
             page.goto(self._page_url, wait_until="domcontentloaded", timeout=30_000)
+            page.wait_for_timeout(2_500)
             png = self._qr_capture(page)
             if not png:
                 self._update(
                     operation_id,
                     status="failed",
-                    message="无法在页面内获取抖音二维码；请在终端运行 `python main.py source login douyin` 用外部浏览器登录。",
+                    message="无法在页面内获取抖音二维码（页面可能被验证码拦截）；请重试，或在终端运行 `python main.py source login douyin`。",
                 )
                 return
             self._update(

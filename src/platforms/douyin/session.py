@@ -42,6 +42,7 @@ def launch_persistent_context(
     profile_dir: Path,
     *,
     headless: bool,
+    extra_args: tuple[str, ...] = (),
 ) -> Any:
     """Return a persistent context, falling back to an installed Chrome/Edge."""
 
@@ -50,7 +51,7 @@ def launch_persistent_context(
         return chromium.launch_persistent_context(
             str(profile_dir),
             headless=headless,
-            args=_LAUNCH_ARGS,
+            args=_LAUNCH_ARGS + tuple(extra_args),
         )
     except Exception as exc:  # bundled Chromium missing or broken
         errors.append(f"bundled={exc}")
@@ -61,7 +62,7 @@ def launch_persistent_context(
                 str(profile_dir),
                 headless=headless,
                 channel=channel,
-                args=_LAUNCH_ARGS,
+                args=_LAUNCH_ARGS + tuple(extra_args),
             )
         except Exception as exc:
             errors.append(f"{channel}={exc}")
@@ -73,7 +74,9 @@ def launch_persistent_context(
 
 
 @contextmanager
-def _playwright_browser(profile_dir: Path, *, headless: bool) -> Iterator[Any]:
+def _playwright_browser(
+    profile_dir: Path, *, headless: bool, extra_args: tuple[str, ...] = ()
+) -> Iterator[Any]:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
@@ -159,14 +162,23 @@ class DouyinSession:
         self.stale_flag.unlink(missing_ok=True)
 
     @contextmanager
-    def open_context(self, *, headless: bool, task: str) -> Iterator[Any]:
+    def open_context(
+        self, *, headless: bool, task: str, offscreen: bool = False
+    ) -> Iterator[Any]:
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         try:
             lease = self._leases.acquire("douyin-profile", owner=task)
         except JobLeaseConflict as exc:
             raise PlatformSessionBusyError(str(exc)) from exc
         try:
-            with self._browser_factory(self.profile_dir, headless=headless) as context:
+            extra_args = (
+                ("--window-position=-32000,-32000", "--window-size=1280,900")
+                if offscreen
+                else ()
+            )
+            with self._browser_factory(
+                self.profile_dir, headless=headless, extra_args=extra_args
+            ) as context:
                 yield context
         finally:
             lease.release()
