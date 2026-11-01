@@ -332,11 +332,17 @@ class DouyinLoginCoordinator:
         while self._clock() < deadline:
             if self._session.is_authenticated(context, page):
                 self._session.mark_authenticated()
-                self._update(
-                    operation_id,
-                    status="succeeded",
-                    message="登录成功，登录态已保存在本机。",
-                )
+                captured = None
+                capture_account = getattr(self._session, "capture_account", None)
+                if callable(capture_account):
+                    try:
+                        captured = capture_account(page)
+                    except Exception:
+                        captured = None
+                message = "登录成功，登录态已保存在本机。"
+                if captured is not None:
+                    message = "登录成功，已记下账号（喜欢 / 收藏 / 发布可直接使用）。"
+                self._update(operation_id, status="succeeded", message=message)
                 return
             self._sleep(self._poll_seconds)
 

@@ -131,6 +131,13 @@ class DouyinAdapter:
         hostname = (urlparse(url).hostname or "").lower()
         return hostname == "douyin.com" or hostname.endswith(".douyin.com")
 
+    @property
+    def account(self):
+        """Logged-in account (sec_uid), captured right after login."""
+
+        loader = getattr(self.session, "account", None)
+        return loader if loader is not None else None
+
     def auth_status(self) -> AuthStatus:
         if self._sidecar_online():
             if has_sidecar_cookie(self._sidecar_dir):

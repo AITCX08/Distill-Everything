@@ -400,6 +400,27 @@ def source_status(platform):
     adapter = _require_platform(manager, platform)
     status = adapter.auth_status()
     console.print(f"{platform}: [cyan]{status.status}[/cyan] {status.message}")
+    account = getattr(adapter, "account", None)
+    if account is not None:
+        console.print(f"[dim]sec_uid: {account.sec_uid}[/dim]")
+
+
+@source.command("account")
+@click.argument("platform", required=False, default="douyin")
+def source_account(platform: str):
+    """显示已登录的账号标识（抖音的 sec_uid）。"""
+
+    from src.config import load_config
+
+    manager = build_platform_manager(load_config())
+    adapter = _require_platform(manager, platform)
+    account = getattr(adapter, "account", None)
+    if account is None:
+        console.print("[yellow]尚未记录账号[/yellow]：先扫码登录（Dashboard 或 source login）")
+        return
+    console.print(f"sec_uid: [cyan]{account.sec_uid}[/cyan]")
+    if account.nickname:
+        console.print(f"昵称: {account.nickname}")
 
 
 @source.command("login")

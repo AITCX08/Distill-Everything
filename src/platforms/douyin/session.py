@@ -242,6 +242,21 @@ class DouyinSession:
     def is_authenticated(self, context: Any, page: Any) -> bool:
         return _context_authenticated(context, page)
 
+    @property
+    def account(self):
+        """Return the captured account (sec_uid) for this profile, if any."""
+
+        from src.platforms.douyin.account import AccountStore
+
+        return AccountStore(self.profile_dir).load()
+
+    def capture_account(self, page: Any):
+        """Best-effort: resolve and persist the signed-in account's sec_uid."""
+
+        from src.platforms.douyin.account import capture
+
+        return capture(self.profile_dir, page)
+
     def auth_status(self) -> AuthStatus:
         if not self._has_profile():
             return AuthStatus("missing", "在「平台与登录」页内扫码登录抖音")
@@ -268,6 +283,7 @@ class DouyinSession:
             while time.monotonic() <= deadline:
                 if _context_authenticated(context, page):
                     self.mark_authenticated()
+                    self.capture_account(page)
                     return
                 self._sleep(self._poll_interval)
         self.mark_stale()
