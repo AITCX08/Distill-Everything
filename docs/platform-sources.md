@@ -275,3 +275,18 @@ POST /api/v1/library/{platform}/jobs               选中条目批量建任务
 | 抖音 | ✅ sidecar | ✅ sidecar | ✅ sidecar(cookie) | 需 sec_uid / cookie |
 | B站 | ✅ | ❌ 无公开接口 | ✅ 收藏夹+内容 | 已用真实账号验证 |
 | 小红书 | ✅ | ⏳ 待接 | ✅ | 需 sidecar 登录 |
+
+
+## 本地文件蒸馏
+
+`python main.py ingest <文件>`：文档走 `src/reader/`，音视频走 `src/reader/media_reader.py`，
+统一产出 cleaned JSON，之后复用 `model` / `generate` 两个阶段。
+
+| 类型 | 支持格式 |
+| --- | --- |
+| 文档 | txt · md · html · csv · json · srt/vtt · docx · pdf · pptx · xlsx · epub |
+| 音频 | wav · mp3 · m4a · aac · flac · ogg · opus · wma · amr · aiff |
+| 视频 | mp4 · mkv · mov · avi · flv · webm · wmv · ts · m4v · mpeg |
+
+音视频处理链：ffmpeg → 16kHz 单声道 WAV → FunASR(paraformer-zh) → cleaned JSON，
+视频只取音轨，画面不参与转写。

@@ -17,6 +17,12 @@ console = Console()
 
 # 支持的文件格式
 SUPPORTED_FORMATS = {".txt", ".docx", ".pdf"}
+
+
+def _all_formats():
+    from src.reader.extra_readers import EXTRA_FORMATS
+
+    return SUPPORTED_FORMATS | set(EXTRA_FORMATS)
 CHAPTER_PATTERN = re.compile(
     r"^(第[一二三四五六七八九十百千\d]+[章节篇]|"
     r"\d+[\.、]\s*.+|"
@@ -74,10 +80,12 @@ def read_document(file_path: Path) -> str:
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
     suffix = file_path.suffix.lower()
-    if suffix not in SUPPORTED_FORMATS:
+    from src.reader.extra_readers import EXTRA_FORMATS
+
+    if suffix not in SUPPORTED_FORMATS and suffix not in EXTRA_FORMATS:
         raise ValueError(
             f"不支持��文件格式: {suffix}，"
-            f"支持: {', '.join(sorted(SUPPORTED_FORMATS))}"
+            f"支持: {', '.join(sorted(_all_formats()))}"
         )
 
     console.print(f"[blue]读取文档: {file_path.name} ({suffix})")
@@ -87,7 +95,12 @@ def read_document(file_path: Path) -> str:
         ".docx": read_docx,
         ".pdf": read_pdf,
     }
-    text = readers[suffix](file_path)
+    if suffix in readers:
+        text = readers[suffix](file_path)
+    else:
+        from src.reader.extra_readers import READERS
+
+        text = READERS[suffix](file_path)
 
     text = normalize_document_text(text)
 

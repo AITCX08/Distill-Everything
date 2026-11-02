@@ -931,6 +931,34 @@ def clean(llm_provider):
     console.print(f"[bold green]阶段3完成! 成功: {success}/{len(pending_files)}")
 
 
+@cli.command("ingest")
+@click.argument("file_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--name", "doc_title", type=str, default=None, help="标题（默认用文件名）")
+@click.option("--llm", "llm_provider", type=LLM_CHOICES, default=None, help="文档主题切分用的 LLM")
+@click.option("--keep-audio", is_flag=True, help="保留从视频中抽出的音频")
+def ingest(file_path: Path, doc_title, llm_provider, keep_audio):
+    """把本地文件（文档 / 音频 / 视频）整理成可蒸馏的 cleaned JSON。"""
+
+    from src.config import load_config
+    from src.clean.text_processor import save_cleaned
+    from src.reader.media_reader import ingest_any, is_media
+
+    config = load_config()
+    llm_client = None
+    if llm_provider:
+        from src.clean.text_processor import create_llm_client
+
+        llm_client = create_llm_client(config, provider=llm_provider)
+
+    console.print(f"[blue]读取[/blue] {file_path.name}（{'音视频' if is_media(file_path) else '文档'}）")
+    cleaned = ingest_any(file_path, config=config, llm_client=llm_client, title=doc_title)
+    cleaned_path = save_cleaned(cleaned, config.cleaned_dir)
+
+    console.print(f"[green]已生成[/green] {cleaned_path}")
+    console.print(f"[dim]{len(cleaned['full_text'])} 字 · {len(cleaned['segments'])} 段[/dim]")
+    console.print("[dim]下一步：python main.py model --llm deepseek 然后 python main.py generate[/dim]")
+
+
 @cli.command("model")
 @click.option("--llm", "llm_provider", type=LLM_CHOICES,
               default=None, help="LLM提供商（覆盖.env中的 LLM_PROVIDER 配置）")

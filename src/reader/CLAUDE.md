@@ -7,6 +7,7 @@
 | 日期 | 变更 |
 |---|---|
 | 2026-04-21 | 初始化模块级 CLAUDE.md（架构师扫描补齐） |
+| 2026-11-02 | 扩展格式：md/html/csv/json/srt/pptx/xlsx/epub 走 `extra_readers.py`；新增 `media_reader.py` 处理 22 种音视频扩展名（ffmpeg 抽音轨 + FunASR） |
 
 ---
 
