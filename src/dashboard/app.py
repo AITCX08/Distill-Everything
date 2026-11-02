@@ -20,6 +20,7 @@ from src.dashboard.api.health import router as health_router
 from src.dashboard.api.artifacts import reveal_directory, router as artifacts_router
 from src.dashboard.api.jobs import router as jobs_router
 from src.dashboard.api.library import router as library_router
+from src.dashboard.api.local import router as local_router
 from src.dashboard.api.platforms import router as platforms_router
 from src.dashboard.api.events import router as events_router
 from src.dashboard.api.tasks import router as tasks_router
@@ -93,6 +94,7 @@ def create_dashboard_app(
     app.include_router(jobs_router)
     app.include_router(platforms_router)
     app.include_router(library_router)
+    app.include_router(local_router)
     app.include_router(artifacts_router)
     app.include_router(events_router)
     app.include_router(tasks_router)
