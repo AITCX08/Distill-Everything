@@ -43,6 +43,7 @@ class XhsSidecar:
         self._http_get = http_get or self._default_get
         self._http_post = http_post or self._default_post
         self._http_get_raw = http_get_raw or self._default_get_raw
+        self.user_id = ""
 
     def _default_get(self, url: str, params: Mapping[str, Any]) -> Any:
         response = requests.get(url, params=dict(params), timeout=self.timeout)
@@ -83,9 +84,11 @@ class XhsSidecar:
         if not self.is_available():
             return False
         try:
-            return bool(self.session_status().get("authenticated"))
+            status = self.session_status()
         except PlatformEnumerationError:
             return False
+        self.user_id = str(status.get("user_id") or "")
+        return bool(status.get("authenticated"))
 
     def _request_post(self, key: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
         path = self._paths.get(key)

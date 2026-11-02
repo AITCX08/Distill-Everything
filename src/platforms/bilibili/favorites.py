@@ -88,6 +88,29 @@ class BilibiliFavorites:
             )
         return payload
 
+    def list_folders(self, up_mid: str) -> tuple[FavoriteFolder, ...]:
+        """List a user's public favorite folders."""
+
+        payload = self._call("/x/v3/fav/folder/created/list-all", {"up_mid": up_mid})
+        data = payload.get("data") if isinstance(payload.get("data"), Mapping) else {}
+        entries = data.get("list") or []
+        folders: list[FavoriteFolder] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            folder_id = str(entry.get("id") or "")
+            if not folder_id:
+                continue
+            folders.append(
+                FavoriteFolder(
+                    media_id=folder_id,
+                    title=str(entry.get("title") or ""),
+                    media_count=int(entry.get("media_count") or 0),
+                    owner="",
+                )
+            )
+        return tuple(folders)
+
     def folder_info(self, media_id: str) -> FavoriteFolder:
         """Fetch folder metadata; raises when the folder is missing or private."""
 

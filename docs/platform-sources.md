@@ -256,3 +256,22 @@ GET /xhs/user/collect?user_id=&cursor= → 同上
 | 2026-10-31 | 小红书 | 目标解析与采集契约 | 单元级：短链/笔记/用户/收藏 21 例；真实链路待 sidecar 启动 | `tests/platforms/xhs/` |
 | 2026-10-31 | 三平台 | 创作者中心 | 单元级：归一化 + 拦截 + 开关 6 例；真机校准待补 | `tests/platforms/test_insights.py` |
 
+
+## 内容库 API（后端）
+
+登录后可读取账号自己的内容，先取"能力矩阵"再取条目：
+
+```
+GET  /api/v1/library/{platform}                    能力矩阵 + account
+GET  /api/v1/library/{platform}/folders            收藏夹列表（B站）
+GET  /api/v1/library/{platform}/items?kind=&cursor=&folder=
+POST /api/v1/library/{platform}/jobs               选中条目批量建任务
+```
+
+平台能力：
+
+| 平台 | 发布 | 喜欢 | 收藏 | 说明 |
+| --- | --- | --- | --- | --- |
+| 抖音 | ✅ sidecar | ✅ sidecar | ✅ sidecar(cookie) | 需 sec_uid / cookie |
+| B站 | ✅ | ❌ 无公开接口 | ✅ 收藏夹+内容 | 已用真实账号验证 |
+| 小红书 | ✅ | ⏳ 待接 | ✅ | 需 sidecar 登录 |

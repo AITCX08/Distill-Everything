@@ -75,6 +75,14 @@ class DouyinAdapter:
         self._sidecar_checked = False
         self._sidecar_ok = False
 
+    @property
+    def sidecar(self):
+        return self._sidecar
+
+    @property
+    def sidecar_dir(self):
+        return self._sidecar_dir
+
     def _sidecar_online(self) -> bool:
         if self._sidecar is None:
             return False

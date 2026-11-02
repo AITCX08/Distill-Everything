@@ -123,6 +123,10 @@ class BilibiliAdapter:
         sessdata = getattr(getattr(config, "bilibili", None), "sessdata", "") or ""
         self._favorites = favorites or BilibiliFavorites(sessdata=sessdata)
 
+    @property
+    def favorites(self):
+        return self._favorites
+
     def matches(self, target: str) -> bool:
         text = target.strip()
         return bool(

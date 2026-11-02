@@ -225,7 +225,20 @@ def build_app(state: LoginState):
 
     @app.get("/xhs/session")
     def session_status() -> dict[str, Any]:
-        return {"authenticated": state.session is not None}
+        if state.session is None:
+            return {"authenticated": False, "user_id": ""}
+        user_id = ""
+        try:
+            from apis.xhs_pc_apis import XHS_PC_Apis
+
+            payload = XHS_PC_Apis(state.session).get_user_me()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            source = data if isinstance(data, dict) else payload
+            if isinstance(source, dict):
+                user_id = str(source.get("user_id") or source.get("userId") or "")
+        except Exception:
+            user_id = ""
+        return {"authenticated": True, "user_id": user_id}
 
     @app.post("/xhs/login")
     def login_start() -> dict[str, Any]:
