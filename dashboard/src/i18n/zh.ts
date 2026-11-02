@@ -26,15 +26,15 @@ export function stageLabel(stage: string): string {
 export const jobStatusLabel = stageLabel;
 
 export function platformLabel(platform: string): string {
-  return ({ bilibili: "哔哩哔哩", douyin: "抖音", youtube: "YouTube", "imported-series": "外部系列任务", auto: "自动识别" } as Record<string, string>)[platform] ?? platform;
+  return ({ bilibili: "哔哩哔哩", douyin: "抖音", xiaohongshu: "小红书", youtube: "YouTube", "imported-series": "外部系列任务", auto: "自动识别" } as Record<string, string>)[platform] ?? platform;
 }
 
 export function authStatusLabel(status: string): string {
-  return ({ configured: "已登录", missing: "未登录", authenticating: "登录中" } as Record<string, string>)[status] ?? status;
+  return ({ configured: "已登录", missing: "未登录", authenticating: "登录中", expired: "已过期", not_required: "无需登录", unavailable: "不可用" } as Record<string, string>)[status] ?? status;
 }
 
 export function itemTypeLabel(itemType: string): string {
-  return ({ video: "视频" } as Record<string, string>)[itemType] ?? itemType;
+  return ({ video: "视频", gallery: "图集" } as Record<string, string>)[itemType] ?? itemType;
 }
 
 export function authMessageLabel(message: string): string {

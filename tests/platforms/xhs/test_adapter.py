@@ -225,5 +225,5 @@ def test_adapter_status_distinguishes_connected_from_logged_in():
     logged_in = XhsAdapter(_Sidecar(True)).auth_status()
 
     assert logged_out.status == "missing"
-    assert "xhs_login" in logged_out.message
+    assert "扫码" in logged_out.message
     assert logged_in.status == "configured"

@@ -234,7 +234,7 @@ def test_auth_status_requires_a_real_sidecar_session(tmp_path):
     status = DouyinAdapter(None, sidecar=sidecar, sidecar_dir=tmp_path).auth_status()
 
     assert status.status == "missing"
-    assert "sync-cookie" in status.message
+    assert "扫码" in status.message
 
 
 def test_auth_status_reports_configured_when_sidecar_has_a_session(tmp_path):

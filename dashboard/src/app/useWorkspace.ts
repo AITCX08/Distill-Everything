@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export const workspaces = ["mission", "create", "platforms", "history", "artifacts"] as const;
+export const workspaces = ["mission", "library", "create", "platforms", "history", "artifacts"] as const;
 export type WorkspaceId = typeof workspaces[number];
 
 function readWorkspace(hash: string): WorkspaceId {

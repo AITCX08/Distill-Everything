@@ -10,7 +10,7 @@ const globalCss = readFileSync(
 
 describe("dashboard sidebar layout", () => {
   it("keeps the runtime status directly below the navigation", () => {
-    const statusPanelRule = globalCss.match(/\.status-panel\{([^}]*)\}/)?.[1];
+    const statusPanelRule = globalCss.match(/\.status-panel\s*\{([^}]*)\}/)?.[1];
 
     expect(statusPanelRule).toBeDefined();
     expect(statusPanelRule).not.toContain("margin-top:auto");

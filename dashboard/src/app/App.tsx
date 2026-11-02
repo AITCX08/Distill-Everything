@@ -1,6 +1,7 @@
 import { MissionControlPage, type ProgressSnapshot } from "../features/mission-control/MissionControlPage";
 import { useMissionControl } from "../features/mission-control/useMissionControl";
 import { CreateJobPage } from "../features/create-job/CreateJobPage";
+import { LibraryPage } from "../features/library/LibraryPage";
 import { PlatformsPage } from "../features/platforms/PlatformsPage";
 import { JobHistoryPage } from "../features/job-history/JobHistoryPage";
 import { ArtifactsPage } from "../features/artifacts/ArtifactsPage";
@@ -43,6 +44,7 @@ export function App() {
         onTaskUpdated={mission?.updateTask}
         onViewArtifacts={() => { window.location.hash = "#artifacts"; }}
       />}
+      {workspace === "library" && <LibraryPage />}
       {workspace === "create" && <CreateJobPage />}
       {workspace === "platforms" && <PlatformsPage />}
       {workspace === "history" && <JobHistoryPage />}

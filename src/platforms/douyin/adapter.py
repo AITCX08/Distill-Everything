@@ -149,10 +149,10 @@ class DouyinAdapter:
     def auth_status(self) -> AuthStatus:
         if self._sidecar_online():
             if has_sidecar_cookie(self._sidecar_dir):
-                return AuthStatus("configured", "抖音 sidecar 已登录")
+                return AuthStatus("configured", "已登录抖音，可以读取你的收藏与喜欢。")
             return AuthStatus(
                 "missing",
-                "sidecar 已连接但尚未登录：扫码后运行 python main.py source sync-cookie",
+                "已连接抖音服务，但还没有登录。点下方按钮扫码，登录后会自动同步。",
             )
         return self.session.auth_status()
 

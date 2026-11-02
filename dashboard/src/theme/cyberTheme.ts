@@ -1,2 +1,37 @@
-import { createLightTheme, type Theme } from "@fluentui/react-components";
-export const cyberTheme: Theme = { ...createLightTheme({10:"#06141a",20:"#082129",30:"#0b2e38",40:"#0c3f4a",50:"#0a5966",60:"#087887",70:"#079eae",80:"#20c7d7",90:"#74e6ed",100:"#c9fbff",110:"#ecffff",120:"#ffffff",130:"#ffffff",140:"#ffffff",150:"#ffffff",160:"#ffffff"}), colorNeutralBackground1:"#081116",colorNeutralBackground2:"#0c191f",colorNeutralBackground3:"#10232a",colorNeutralForeground1:"#e6f7fa",colorNeutralForeground2:"#a5c5ca",colorBrandBackground:"#099bae",colorBrandForeground1:"#74e6ed",colorPaletteGreenForeground1:"#68d6ab",colorPaletteYellowForeground1:"#ffc85a",colorPaletteRedForeground1:"#ff7d7d" };
+import { createDarkTheme, type Theme } from "@fluentui/react-components";
+
+/** 氧化铜品牌阶（亮度从深到浅），供 Fluent 计算 dark 主题衍生色。 */
+const copperRamp = {
+  10: "#2a1710",
+  20: "#3a1f14",
+  30: "#4d2a1a",
+  40: "#633622",
+  50: "#7d4429",
+  60: "#9a5433",
+  70: "#b26439",
+  80: "#c2734a",
+  90: "#d18a63",
+  100: "#dfa37f",
+  110: "#ebbd9e",
+  120: "#f3d3bd",
+  130: "#f8e4d5",
+  140: "#fbece2",
+  150: "#fdf3ec",
+  160: "#ffffff",
+};
+
+export const cyberTheme: Theme = {
+  ...createDarkTheme(copperRamp),
+  colorNeutralBackground1: "#141c20",
+  colorNeutralBackground2: "#1b252a",
+  colorNeutralBackground3: "#0f1518",
+  colorNeutralForeground1: "#e7e2d6",
+  colorNeutralForeground2: "#a9a79c",
+  colorNeutralForeground3: "#7c878b",
+  colorBrandBackground: "#c2734a",
+  colorBrandBackgroundHover: "#d9946b",
+  colorBrandForeground1: "#d9946b",
+  colorPaletteGreenForeground1: "#5f9a8b",
+  colorPaletteYellowForeground1: "#d7a15c",
+  colorPaletteRedForeground1: "#c25f52",
+};

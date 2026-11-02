@@ -4,6 +4,7 @@ import {
   AddSquareRegular,
   BookRegular,
   DocumentRegular,
+  FolderOpenRegular,
   GlobeRegular,
   HistoryRegular,
   HomeRegular,
@@ -14,6 +15,7 @@ import type { HealthResponse, RuntimeModels } from "../api/schema";
 
 const navigation: ReadonlyArray<{ id: WorkspaceId; label: string; icon: typeof HomeRegular }> = [
   { id: "mission", label: "工作台", icon: HomeRegular },
+  { id: "library", label: "内容库", icon: FolderOpenRegular },
   { id: "create", label: "创建任务", icon: AddSquareRegular },
   { id: "platforms", label: "平台与登录", icon: GlobeRegular },
   { id: "history", label: "任务管理", icon: HistoryRegular },

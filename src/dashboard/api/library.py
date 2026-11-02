@@ -4,13 +4,38 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from src.application.library import SUPPORTED, LibraryService
 from src.dashboard.security import require_local_session, require_mutation_security
 
 router = APIRouter(prefix="/api/v1/library", tags=["library"])
+
+_COVER_HOSTS = ("hdslb.com", "douyinpic.com", "douyinstatic.com", "xhscdn.com", "sns-img")
+
+
+@router.get("/cover", dependencies=[Depends(require_local_session)])
+def library_cover(url: str) -> Response:
+    """代理封面图：浏览器可能走系统代理拉不到图床，这里由后端直连。"""
+
+    import requests
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    if not host.endswith(_COVER_HOSTS):
+        raise HTTPException(status_code=400, detail="不支持的封面来源")
+    try:
+        upstream = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        upstream.raise_for_status()
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"封面读取失败：{error}") from error
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "image/jpeg"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 
 def _library(request: Request) -> LibraryService:
